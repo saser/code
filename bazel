@@ -1,0 +1,4 @@
+#!/bin/bash
+
+make _tools/bazelisk
+exec _tools/bazelisk "$@"
