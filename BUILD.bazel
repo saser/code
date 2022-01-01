@@ -1,0 +1,18 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:exclude _tools
+# gazelle:prefix go.saser.se
+# gazelle:proto disable_global
+gazelle(
+    name = "gazelle",
+)
+
+gazelle(
+    name = "gazelle_update_repos",
+    args = [
+        "-from_file=go.mod",
+        "-to_macro=repositories.bzl%go_repositories",
+        "-prune",
+    ],
+    command = "update-repos",
+)
