@@ -2,6 +2,17 @@ include tools.mk
 
 build_files := $(shell git ls-files -- 'WORKSPACE' '**/BUILD.bazel' '*.bzl')
 go_files := $(shell git ls-files -- '*.go')
+proto_files := $(shell git ls-files -- '*.proto')
+
+.PHONY: generate
+generate: protoc
+
+.PHONY: protoc
+protoc: \
+	$(proto_files) \
+	$(protoc)
+protoc:
+	$(protoc) --version
 
 .PHONY: fix
 fix: buildifier gofumpt

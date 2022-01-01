@@ -31,3 +31,22 @@ $(gofumpt): go.mod
 		build \
 		-o='$@' \
 		mvdan.cc/gofumpt
+
+# protoc: the protobuf compiler.
+protoc_version := 3.19.1
+protoc_archive := $(tools)/protoc_$(protoc_version).zip
+$(protoc_archive):
+	curl \
+		--fail \
+		--location \
+		--show-error \
+		--silent \
+		--output '$@' \
+		'https://github.com/protocolbuffers/protobuf/releases/download/v$(protoc_version)/protoc-$(protoc_version)-linux-x86_64.zip'
+protoc_dir := $(tools)/protoc_$(protoc_version)
+$(protoc_dir): $(protoc_archive)
+	unzip \
+		'$(protoc_archive)' \
+		-d '$@'
+protoc := $(protoc_dir)/bin/protoc
+$(protoc): $(protoc_dir)
