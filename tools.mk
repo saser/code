@@ -50,3 +50,19 @@ $(protoc_dir): $(protoc_archive)
 		-d '$@'
 protoc := $(protoc_dir)/bin/protoc
 $(protoc): $(protoc_dir)
+
+# protoc-gen-go: the protoc plugin for generating Go code from protobufs.
+protoc-gen-go := $(tools)/protoc-gen-go
+$(protoc-gen-go): go.mod
+	go \
+		build \
+		-o='$@' \
+		google.golang.org/protobuf/cmd/protoc-gen-go
+
+# protoc-gen-go-grpc: the protoc plugin for generating gRPC-Go code from protobufs.
+protoc-gen-go-grpc := $(tools)/protoc-gen-go-grpc
+$(protoc-gen-go-grpc): go.mod
+	go \
+		build \
+		-o='$@' \
+		google.golang.org/grpc/cmd/protoc-gen-go-grpc
