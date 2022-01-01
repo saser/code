@@ -23,3 +23,11 @@ $(buildifier): go.mod
 		build \
 		-o='$@' \
 		github.com/bazelbuild/buildtools/buildifier
+
+# gofumpt: a stricter subset of gofmt.
+gofumpt := $(tools)/gofumpt
+$(gofumpt): go.mod
+	go \
+		build \
+		-o='$@' \
+		mvdan.cc/gofumpt
