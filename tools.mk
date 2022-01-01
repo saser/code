@@ -15,3 +15,11 @@ $(bazelisk): go.mod $(tools)
 		build \
 		-o='$@' \
 		github.com/bazelbuild/bazelisk
+
+# buildifier: a formatter and linter for BUILD.bazel files.
+buildifier := $(tools)/buildifier
+$(buildifier): go.mod
+	go \
+		build \
+		-o='$@' \
+		github.com/bazelbuild/buildtools/buildifier
