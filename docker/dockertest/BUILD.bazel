@@ -1,0 +1,32 @@
+load("@io_bazel_rules_docker//container:image.bzl", "container_image")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+container_image(
+    name = "hello_world_image",
+    base = "@hello_world_image//image",
+)
+
+go_library(
+    name = "dockertest",
+    srcs = ["dockertest.go"],
+    importpath = "go.saser.se/docker/dockertest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//docker/imagetar",
+        "//runfiles",
+        "@com_github_docker_docker//api/types",
+        "@com_github_docker_docker//api/types/container",
+        "@com_github_docker_docker//client",
+        "@com_github_docker_go_connections//nat",
+    ],
+)
+
+go_test(
+    name = "dockertest_test",
+    srcs = ["dockertest_test.go"],
+    data = [
+        "hello_world_image.tar",
+        "//postgres:image.tar",
+    ],
+    embed = [":dockertest"],
+)
