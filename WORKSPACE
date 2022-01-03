@@ -57,3 +57,11 @@ container_pull(
     registry = "index.docker.io",
     repository = "library/postgres",
 )
+
+container_pull(
+    name = "hello_world_image",
+    # tag = "linux",
+    digest = "sha256:f54a58bc1aac5ea1a25d796ae155dc228b3f0e11d046ae276b39c4bf2f13d8c4",  # tag "linux" as of 2022-01-08
+    registry = "index.docker.io",
+    repository = "library/hello-world",
+)
