@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/bazelbuild/bazelisk v1.11.0
 	github.com/bazelbuild/buildtools v0.0.0-20211129135157-cdedcc0318b9
+	github.com/bazelbuild/rules_go v0.29.0
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v4 v4.14.1

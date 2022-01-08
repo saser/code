@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "runfiles",
+    srcs = ["runfiles.go"],
+    importpath = "go.saser.se/runfiles",
+    visibility = ["//visibility:public"],
+    deps = ["@io_bazel_rules_go//go/tools/bazel:go_default_library"],
+)
+
+go_test(
+    name = "runfiles_test",
+    srcs = ["runfiles_test.go"],
+    data = ["test.txt"],
+    embed = [":runfiles"],
+)
