@@ -11,7 +11,10 @@ import (
 	"go.saser.se/runfiles"
 )
 
-var testimage = runfiles.MustRead("docker/imagetar/testimage.tar")
+var (
+	testimage  = runfiles.MustRead("docker/imagetar/testimage_hello_world.tar")
+	testbundle = runfiles.MustRead("docker/imagetar/testbundle.tar")
+)
 
 // replaceFile reads the given tar archive, replaces the named file with the
 // given contents, and returns the resulting archive as a byte slice. As a
@@ -55,17 +58,40 @@ func replaceFile(t *testing.T, archive []byte, name string, contents []byte) []b
 }
 
 func TestRepositories(t *testing.T) {
-	want := map[string]map[string]string{
-		"bazel/docker/imagetar": {
-			"testimage": "a5f34025714d147c8ad37b8e237b52af7b58a5f44be46a5e550f0873705d1f24",
+	for _, tt := range []struct {
+		name string
+		r    io.Reader
+		want map[string]map[string]string
+	}{
+		{
+			name: "SingleImage",
+			r:    bytes.NewReader(testimage),
+			want: map[string]map[string]string{
+				"bazel/docker/imagetar": {
+					"testimage_hello_world": "a5f34025714d147c8ad37b8e237b52af7b58a5f44be46a5e550f0873705d1f24",
+				},
+			},
 		},
-	}
-	got, err := Repositories(bytes.NewReader(testimage))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("Repositories: unexpected return value (-want +got)\n%s", diff)
+		{
+			name: "Bundle",
+			r:    bytes.NewReader(testbundle),
+			want: map[string]map[string]string{
+				"bazel/docker/imagetar": {
+					"testimage_hello_world": "a5f34025714d147c8ad37b8e237b52af7b58a5f44be46a5e550f0873705d1f24",
+					"testimage_postgres":    "dbb3b0216e75b7d3bdaa1e956da967d6ded3809bd85f3887dbda8f6114868de0",
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Repositories(tt.r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Repositories: unexpected return value (-want +got)\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -90,6 +116,66 @@ func TestRepositories_Error(t *testing.T) {
 			_, got := Repositories(tt.r)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("unexpected error from Repositories (-want +got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestImages(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		r    io.Reader
+		want []string
+	}{
+		{
+			name: "SingleImage",
+			r:    bytes.NewReader(testimage),
+			want: []string{
+				"bazel/docker/imagetar:testimage_hello_world",
+			},
+		},
+		{
+			name: "Bundle",
+			r:    bytes.NewReader(testbundle),
+			want: []string{
+				"bazel/docker/imagetar:testimage_hello_world",
+				"bazel/docker/imagetar:testimage_postgres",
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Images(tt.r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("unexpected result from Images (-want +got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestImages_Error(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		r    io.Reader
+		want error
+	}{
+		{
+			name: "NotFound",
+			r:    bytes.NewReader(replaceFile(t, testimage, "repositories", nil)),
+			want: ErrRepositoriesNotFound,
+		},
+		{
+			name: "Invalid",
+			r:    bytes.NewReader(replaceFile(t, testimage, "repositories", []byte("this is not JSON"))),
+			want: ErrRepositoriesInvalid,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, got := Images(tt.r)
+			if diff := cmp.Diff(tt.want, got, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("unexpected error from Images (-want +got)\n%s", diff)
 			}
 		})
 	}

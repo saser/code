@@ -54,3 +54,20 @@ func Repositories(r io.Reader) (map[string]map[string]string, error) {
 		return repositories, nil
 	}
 }
+
+// Images parses the "repositories" file at the root of the archive and returns
+// a list of image names contained in that archive. The strings will have the
+// format "path/to/repo:tag".
+func Images(r io.Reader) ([]string, error) {
+	repos, err := Repositories(r)
+	if err != nil {
+		return nil, err
+	}
+	var images []string
+	for repo, tags := range repos {
+		for tag := range tags {
+			images = append(images, repo+":"+tag)
+		}
+	}
+	return images, nil
+}
