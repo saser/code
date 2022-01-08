@@ -23,6 +23,15 @@ func PathT(tb testing.TB, name string) string {
 	return path
 }
 
+// MustPath is like Path but panics on error.
+func MustPath(name string) string {
+	path, err := Path(name)
+	if err != nil {
+		panic(err)
+	}
+	return path
+}
+
 // Open opens the given runfile.
 func Open(name string) (*os.File, error) {
 	path, err := Path(name)
@@ -44,6 +53,15 @@ func OpenT(tb testing.TB, name string) *os.File {
 	return f
 }
 
+// MustOpen is like Open but panics on error.
+func MustOpen(name string) *os.File {
+	f, err := Open(name)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
 // Read reads the entire contents of the given runfile.
 func Read(name string) ([]byte, error) {
 	path, err := Path(name)
@@ -59,6 +77,15 @@ func ReadT(tb testing.TB, name string) []byte {
 	d, err := Read(name)
 	if err != nil {
 		tb.Fatal(err)
+	}
+	return d
+}
+
+// MustRead is like Read but panics on error.
+func MustRead(name string) []byte {
+	d, err := Read(name)
+	if err != nil {
+		panic(err)
 	}
 	return d
 }
