@@ -26,13 +26,16 @@ protoc:
 		$(proto_files)
 
 .PHONY: fix
-fix: buildifier gofumpt
+fix: \
+	fix-buildifier \
+	fix-go-buildfiles \
+	fix-gofumpt
 
-.PHONY: buildifier
-buildifier: \
+.PHONY: fix-buildifier
+fix-buildifier: \
 	$(build_files) \
 	$(buildifier)
-buildifier:
+fix-buildifier:
 	$(buildifier) \
 		-lint=fix \
 		-warnings=all \
@@ -40,11 +43,17 @@ buildifier:
 		-v \
 		$(build_files)
 
-.PHONY: gofumpt
-gofumpt: \
+.PHONY: fix-gofumpt
+fix-gofumpt: \
 	$(go_files) \
 	$(gofumpt)
-gofumpt:
+fix-gofumpt:
 	$(gofumpt) \
 		-w \
 		$(go_files)
+
+.PHONY: fix-go-buildfiles
+fix-go-buildfiles:
+	go mod tidy -v
+	./bazel run //:gazelle_update_repos
+	./bazel run //:gazelle
