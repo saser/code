@@ -18,7 +18,28 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 )
 
-func setup(ctx context.Context, t *testing.T) pb.TasksClient {
+type testClient struct {
+	pb.TasksClient
+}
+
+func (c *testClient) CreateTaskT(ctx context.Context, t *testing.T, req *pb.CreateTaskRequest) *pb.Task {
+	t.Helper()
+	task, err := c.CreateTask(ctx, req)
+	if err != nil {
+		t.Fatalf("CreateTask(%v) err = %v; want nil", req, err)
+	}
+	return task
+}
+
+func (c *testClient) DeleteTaskT(ctx context.Context, t *testing.T, req *pb.DeleteTaskRequest) {
+	t.Helper()
+	_, err := c.DeleteTask(ctx, req)
+	if err != nil {
+		t.Fatalf("DeleteTask(%v) err = %v; want nil", req, err)
+	}
+}
+
+func setup(ctx context.Context, t *testing.T) *testClient {
 	t.Helper()
 
 	const bufSize = 1024 * 1024
@@ -61,7 +82,7 @@ func setup(ctx context.Context, t *testing.T) pb.TasksClient {
 		}
 	})
 
-	return pb.NewTasksClient(cc)
+	return &testClient{TasksClient: pb.NewTasksClient(cc)}
 }
 
 func TestService_CreateTask(t *testing.T) {
@@ -130,25 +151,9 @@ func TestService_DeleteTask(t *testing.T) {
 	ctx := context.Background()
 	c := setup(ctx, t)
 
-	// Creating a task should succeed.
-	var task *pb.Task
-	{
-		want := &pb.Task{Title: "This will be deleted"}
-		req := &pb.CreateTaskRequest{
-			Task: want,
-		}
-		got, err := c.CreateTask(ctx, req)
-		if err != nil {
-			t.Fatalf("CreateTask(%v) err = %v; want nil", req, err)
-		}
-		if got.GetName() == "" {
-			t.Error("got.GetName() is empty")
-		}
-		if diff := cmp.Diff(want, got, protocmp.Transform(), protocmp.IgnoreFields(task, "name")); diff != "" {
-			t.Errorf("CreateTask(%v): unexpected result (-want +got)\n%s", req, diff)
-		}
-		task = got
-	}
+	task := c.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{Title: "This will be deleted"},
+	})
 
 	// Once the task has been created it should be deleted.
 	{
