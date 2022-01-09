@@ -22,6 +22,15 @@ type testClient struct {
 	pb.TasksClient
 }
 
+func (c *testClient) GetTaskT(ctx context.Context, t *testing.T, req *pb.GetTaskRequest) *pb.Task {
+	t.Helper()
+	task, err := c.GetTask(ctx, req)
+	if err != nil {
+		t.Fatalf("GetTask(%v) err = %v; want nil", req, err)
+	}
+	return task
+}
+
 func (c *testClient) CreateTaskT(ctx context.Context, t *testing.T, req *pb.CreateTaskRequest) *pb.Task {
 	t.Helper()
 	task, err := c.CreateTask(ctx, req)
@@ -83,6 +92,114 @@ func setup(ctx context.Context, t *testing.T) *testClient {
 	})
 
 	return &testClient{TasksClient: pb.NewTasksClient(cc)}
+}
+
+func TestService_GetTask(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := setup(ctx, t)
+
+	task := c.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:       "Get this",
+			Description: "Be sure to get this!!!",
+		},
+	})
+
+	// Getting the task by name should produce the same result.
+	req := &pb.GetTaskRequest{
+		Name: task.GetName(),
+	}
+	got, err := c.GetTask(ctx, req)
+	if err != nil {
+		t.Fatalf("GetTask(%v) err = %v; want nil", req, err)
+	}
+	if diff := cmp.Diff(task, got, protocmp.Transform()); diff != "" {
+		t.Errorf("GetTask(%v): unexpected result (-want +got)\n%s", req, diff)
+	}
+}
+
+func TestService_GetTask_AfterDeletion(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := setup(ctx, t)
+
+	task := c.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:       "Get this",
+			Description: "Be sure to get this!!!",
+		},
+	})
+
+	// Getting the task by name should produce the same result.
+	{
+		req := &pb.GetTaskRequest{
+			Name: task.GetName(),
+		}
+		got := c.GetTaskT(ctx, t, req)
+		if diff := cmp.Diff(task, got, protocmp.Transform()); diff != "" {
+			t.Errorf("GetTask(%v): unexpected result (-want +got)\n%s", req, diff)
+		}
+	}
+
+	// After deleting the task, getting the task by name should produce a "not
+	// found" error.
+	{
+		c.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+			Name: task.GetName(),
+		})
+
+		req := &pb.GetTaskRequest{
+			Name: task.GetName(),
+		}
+		_, err := c.GetTask(ctx, req)
+		if got, want := status.Code(err), codes.NotFound; got != want {
+			t.Errorf("GetTask(%v) code = %v; want %v", req, got, want)
+		}
+	}
+}
+
+func TestService_GetTask_Error(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := setup(ctx, t)
+	for _, tt := range []struct {
+		name string
+		req  *pb.GetTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "EmptyName",
+			req:  &pb.GetTaskRequest{Name: ""},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "InvalidName",
+			req:  &pb.GetTaskRequest{Name: "invalid/" + uuid.NewString()},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "NotFound_UUID",
+			req:  &pb.GetTaskRequest{Name: "tasks/" + uuid.NewString()},
+			want: codes.NotFound,
+		},
+		{
+			name: "NotFound_NotUUID",
+			req: &pb.GetTaskRequest{
+				// This is a valid name -- there is no guarantee that the name
+				// will be a UUID.
+				Name: "tasks/1",
+			},
+			want: codes.NotFound,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := c.GetTask(ctx, tt.req)
+			if got := status.Code(err); got != tt.want {
+				t.Errorf("GetTask(%v) code = %v; want %v", tt.req, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestService_CreateTask(t *testing.T) {

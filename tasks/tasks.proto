@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 option go_package = "go.saser.se/tasks/tasks_go_proto";
 
 service Tasks {
+    rpc GetTask(GetTaskRequest) returns (Task);
     rpc CreateTask(CreateTaskRequest) returns (Task);
     rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
 }
@@ -19,6 +20,10 @@ message Task {
     string description = 3;
 
     bool completed = 4;
+}
+
+message GetTaskRequest {
+    string name = 1;
 }
 
 message CreateTaskRequest {

@@ -27,6 +27,42 @@ func New(pool *pgxpool.Pool) *Service {
 	}
 }
 
+func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if !strings.HasPrefix(name, "tasks/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	id, err := uuid.Parse(strings.TrimPrefix(name, "tasks/"))
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	task := &pb.Task{
+		Name: name,
+	}
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		sql := strings.TrimSpace(`
+SELECT
+    title,
+	description,
+	completed
+FROM
+    tasks
+WHERE
+	uuid = $1
+`)
+		return tx.QueryRow(ctx, sql, id).Scan(&task.Title, &task.Description, &task.Completed)
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+		}
+		return nil, status.Error(codes.Internal, "Something went wrong.")
+	}
+	return task, nil
+}
+
 func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.Task, error) {
 	task := req.GetTask()
 	if task.GetTitle() == "" {
