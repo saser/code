@@ -3,13 +3,11 @@ package service_test
 import (
 	"context"
 	"net"
-	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"go.saser.se/postgres/postgrestest"
 	"go.saser.se/tasks/service"
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc"
@@ -19,20 +17,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/testing/protocmp"
 )
-
-func newPool(ctx context.Context, t *testing.T) *pgxpool.Pool {
-	t.Helper()
-	connString := os.Getenv("TASKS_TEST_DATABASE")
-	if connString == "" {
-		t.Fatal("environment variable $TASKS_TEST_DATABASE is empty")
-	}
-	pool, err := pgxpool.Connect(ctx, connString)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
-}
 
 func setup(ctx context.Context, t *testing.T) pb.TasksClient {
 	t.Helper()
@@ -45,19 +29,8 @@ func setup(ctx context.Context, t *testing.T) pb.TasksClient {
 		}
 	})
 
-	pool := newPool(ctx, t)
-	t.Cleanup(func() {
-		if err := pool.BeginFunc(ctx, func(tx pgx.Tx) error {
-			sql := "TRUNCATE TABLE tasks"
-			_, err := tx.Exec(ctx, sql)
-			return err
-		}); err != nil {
-			t.Error(err)
-		}
-	})
-
 	srv := grpc.NewServer()
-	svc := service.New(newPool(ctx, t))
+	svc := service.New(postgrestest.Open(ctx, t, "tasks/postgres/schema.sql"))
 	pb.RegisterTasksServer(srv, svc)
 	errc := make(chan error, 1)
 	go func() {
@@ -92,6 +65,7 @@ func setup(ctx context.Context, t *testing.T) pb.TasksClient {
 }
 
 func TestService_CreateTask(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	c := setup(ctx, t)
 
@@ -111,7 +85,48 @@ func TestService_CreateTask(t *testing.T) {
 	}
 }
 
+func TestService_CreateTask_Error(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := setup(ctx, t)
+	for _, tt := range []struct {
+		name string
+		req  *pb.CreateTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "EmptyTitle",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:     "",
+					Completed: false,
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "AlreadyCompleted",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:     "Something already done",
+					Completed: true,
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := c.CreateTask(ctx, tt.req)
+			if got := status.Code(err); got != tt.want {
+				t.Errorf("CreateTask(%v) code = %v; want %v", tt.req, got, tt.want)
+				t.Logf("err = %v", err)
+			}
+		})
+	}
+}
+
 func TestService_DeleteTask(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	c := setup(ctx, t)
 
@@ -155,6 +170,7 @@ func TestService_DeleteTask(t *testing.T) {
 }
 
 func TestService_DeleteTask_Error(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	c := setup(ctx, t)
 	for _, tt := range []struct {

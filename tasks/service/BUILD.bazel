@@ -19,13 +19,13 @@ go_library(
 go_test(
     name = "service_test",
     srcs = ["service_test.go"],
+    data = ["//tasks/postgres:schema.sql"],
     deps = [
         ":service",
+        "//postgres/postgrestest",
         "//tasks/tasks_go_proto",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_uuid//:uuid",
-        "@com_github_jackc_pgx_v4//:pgx",
-        "@com_github_jackc_pgx_v4//pgxpool",
         "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//credentials/insecure",

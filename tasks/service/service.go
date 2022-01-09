@@ -30,17 +30,17 @@ func New(pool *pgxpool.Pool) *Service {
 func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.Task, error) {
 	task := req.GetTask()
 	if task.GetTitle() == "" {
-		return nil, status.Error(codes.InvalidArgument, "The task to be created must have a title.")
+		return nil, status.Error(codes.InvalidArgument, "The task must have a title.")
 	}
 	if task.GetCompleted() {
-		return nil, status.Error(codes.InvalidArgument, "The task to be created must not already be completed.")
+		return nil, status.Error(codes.InvalidArgument, "The task must not already be completed.")
 	}
 	id := uuid.New()
 	task.Name = "tasks/" + id.String()
 	err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		sql := strings.TrimSpace(`
 INSERT INTO tasks (uuid, title, description, completed)
-VALUES            ($1,   $2,    $3,          $4)
+VALUES            ($1,   $2,    $3,          $4       )
 `)
 		_, err := tx.Exec(ctx, sql,
 			id,                    // $1
@@ -62,14 +62,14 @@ VALUES            ($1,   $2,    $3,          $4)
 func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*emptypb.Empty, error) {
 	name := req.GetName()
 	if name == "" {
-		return nil, status.Error(codes.InvalidArgument, "The name of the task to be deleted is required.")
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
 	if !strings.HasPrefix(name, "tasks/") {
-		return nil, status.Errorf(codes.InvalidArgument, `The name of the task to be deleted must have format "tasks/{task}", but it was %q.`, name)
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
 	id, err := uuid.Parse(strings.TrimPrefix(name, "tasks/"))
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, `The name of the task to be deleted must have format "tasks/{task}", but it was %q.`, name)
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
 	errNotFound := errors.New("not found")
 	txFunc := func(tx pgx.Tx) error {
