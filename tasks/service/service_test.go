@@ -218,7 +218,13 @@ func TestService_CreateTask(t *testing.T) {
 	if got.GetName() == "" {
 		t.Error("got.GetName() is empty")
 	}
-	if diff := cmp.Diff(task, got, protocmp.Transform(), protocmp.IgnoreFields(task, "name")); diff != "" {
+	if err := got.GetCreateTime().CheckValid(); err != nil {
+		t.Errorf("got.GetCreateTime() is invalid: %v", err)
+	}
+	if got, want := got.GetCreateTime().AsTime().IsZero(), false; got != want {
+		t.Errorf("got.GetCreateTime().AsTime().IsZero() = %v; want %v", got, want)
+	}
+	if diff := cmp.Diff(task, got, protocmp.Transform(), protocmp.IgnoreFields(task, "name", "create_time")); diff != "" {
 		t.Errorf("CreateTask(%v): unexpected result (-want +got)\n%s", req, diff)
 	}
 }

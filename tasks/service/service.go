@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Service struct {
@@ -42,24 +44,32 @@ func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task
 	task := &pb.Task{
 		Name: name,
 	}
+	var createTime time.Time
 	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		sql := strings.TrimSpace(`
 SELECT
     title,
 	description,
-	completed
+	completed,
+	create_time
 FROM
     tasks
 WHERE
 	uuid = $1
 `)
-		return tx.QueryRow(ctx, sql, id).Scan(&task.Title, &task.Description, &task.Completed)
+		return tx.QueryRow(ctx, sql, id).Scan(
+			&task.Title,
+			&task.Description,
+			&task.Completed,
+			&createTime,
+		)
 	}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 		}
 		return nil, status.Error(codes.Internal, "Something went wrong.")
 	}
+	task.CreateTime = timestamppb.New(createTime)
 	return task, nil
 }
 
@@ -75,17 +85,21 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 	task.Name = "tasks/" + id.String()
 	err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		sql := strings.TrimSpace(`
-INSERT INTO tasks (uuid, title, description, completed)
-VALUES            ($1,   $2,    $3,          $4       )
+INSERT INTO tasks (uuid, title, description, completed, create_time)
+VALUES            ($1,   $2,    $3,          $4,        NOW()      )
+RETURNING create_time
 `)
-		_, err := tx.Exec(ctx, sql,
+		var createTime time.Time
+		err := tx.QueryRow(ctx, sql,
 			id,                    // $1
 			task.GetTitle(),       // $2
 			task.GetDescription(), // $3
 			task.GetCompleted(),   // $4
-		)
+		).Scan(&createTime)
 		if err != nil {
 			log.Print(err)
+		} else {
+			task.CreateTime = timestamppb.New(createTime)
 		}
 		return err
 	})

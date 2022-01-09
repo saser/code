@@ -3,6 +3,7 @@ syntax = "proto3";
 package tasks;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "go.saser.se/tasks/tasks_go_proto";
 
@@ -32,6 +33,9 @@ message Task {
 
     // Whether the task has been completed.
     bool completed = 4;
+
+    // When the task was created.
+    google.protobuf.Timestamp create_time = 5;
 }
 
 message GetTaskRequest {

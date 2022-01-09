@@ -5,6 +5,7 @@ CREATE TABLE tasks (
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     completed BOOLEAN NOT NULL,
+    create_time TIMESTAMP WITH TIME ZONE NOT NULL,
 
     PRIMARY KEY (uuid),
     CONSTRAINT title_not_empty CHECK (title <> '')
