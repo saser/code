@@ -7,29 +7,48 @@ import "google/protobuf/empty.proto";
 option go_package = "go.saser.se/tasks/tasks_go_proto";
 
 service Tasks {
+    // Get a single task by name.
     rpc GetTask(GetTaskRequest) returns (Task);
+
+    // Create a new task.
     rpc CreateTask(CreateTaskRequest) returns (Task);
+
+    // Delete a task by name.
     rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
 }
 
+// A task is something that can be completed.
 message Task {
+    // The name of the task.
+    // Format: tasks/{task}
     string name = 1;
 
+    // The title of the task. Must be a short string.
     string title = 2;
 
+    // The description of the task. Can be a long string. Not all tasks have
+    // descriptions.
     string description = 3;
 
+    // Whether the task has been completed.
     bool completed = 4;
 }
 
 message GetTaskRequest {
+    // The name.
+    // Format: tasks/{task}
     string name = 1;
 }
 
 message CreateTaskRequest {
+    // The task to be created. The `name` field will be ignored. The `title`
+    // field must not be empty, and the `completed` field, if specified, must be
+    // false.
     Task task = 1;
 }
 
 message DeleteTaskRequest {
+    // The name.
+    // Format: tasks/{task}
     string name = 1;
 }

@@ -23,8 +23,11 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TasksClient interface {
+	// Get a single task by name.
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Create a new task.
 	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Delete a task by name.
 	DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -67,8 +70,11 @@ func (c *tasksClient) DeleteTask(ctx context.Context, in *DeleteTaskRequest, opt
 // All implementations must embed UnimplementedTasksServer
 // for forward compatibility
 type TasksServer interface {
+	// Get a single task by name.
 	GetTask(context.Context, *GetTaskRequest) (*Task, error)
+	// Create a new task.
 	CreateTask(context.Context, *CreateTaskRequest) (*Task, error)
+	// Delete a task by name.
 	DeleteTask(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTasksServer()
 }

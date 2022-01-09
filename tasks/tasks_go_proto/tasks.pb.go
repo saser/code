@@ -21,15 +21,22 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// A task is something that can be completed.
 type Task struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Name        string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Title       string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	// The name of the task.
+	// Format: tasks/{task}
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// The title of the task. Must be a short string.
+	Title string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	// The description of the task. Can be a long string. Not all tasks have
+	// descriptions.
 	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Completed   bool   `protobuf:"varint,4,opt,name=completed,proto3" json:"completed,omitempty"`
+	// Whether the task has been completed.
+	Completed bool `protobuf:"varint,4,opt,name=completed,proto3" json:"completed,omitempty"`
 }
 
 func (x *Task) Reset() {
@@ -97,6 +104,8 @@ type GetTaskRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The name.
+	// Format: tasks/{task}
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 }
 
@@ -144,6 +153,9 @@ type CreateTaskRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The task to be created. The `name` field will be ignored. The `title`
+	// field must not be empty, and the `completed` field, if specified, must be
+	// false.
 	Task *Task `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
 }
 
@@ -191,6 +203,8 @@ type DeleteTaskRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The name.
+	// Format: tasks/{task}
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 }
 
