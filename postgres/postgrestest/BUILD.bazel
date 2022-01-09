@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "postgrestest",
+    srcs = ["postgrestest.go"],
+    data = ["//postgres:image.tar"],
+    importpath = "go.saser.se/postgres/postgrestest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//docker/dockertest",
+        "//runfiles",
+        "@com_github_jackc_pgx_v4//pgxpool",
+    ],
+)
+
+go_test(
+    name = "postgrestest_test",
+    srcs = ["postgrestest_test.go"],
+    data = ["schema.sql"],
+    embed = [":postgrestest"],
+)

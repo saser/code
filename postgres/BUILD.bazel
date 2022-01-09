@@ -1,0 +1,7 @@
+load("@io_bazel_rules_docker//container:image.bzl", "container_image")
+
+container_image(
+    name = "image",
+    base = "@postgres_image//image",
+    visibility = ["//visibility:public"],
+)
