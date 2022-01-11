@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//postgres",
         "//tasks/tasks_go_proto",
+        "@com_github_golang_glog//:glog",
         "@com_github_google_uuid//:uuid",
         "@com_github_jackc_pgx_v4//:pgx",
         "@org_golang_google_grpc//codes",
@@ -21,17 +22,18 @@ go_test(
     name = "service_test",
     srcs = ["service_test.go"],
     data = ["//tasks/postgres:schema.sql"],
+    embed = [":service"],
     deps = [
-        ":service",
         "//postgres/postgrestest",
         "//tasks/tasks_go_proto",
         "@com_github_google_go_cmp//cmp",
-        "@com_github_google_uuid//:uuid",
+        "@com_github_google_go_cmp//cmp/cmpopts",
         "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//credentials/insecure",
         "@org_golang_google_grpc//status",
         "@org_golang_google_grpc//test/bufconn",
+        "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//testing/protocmp",
     ],
 )

@@ -158,6 +158,123 @@ func (x *GetTaskRequest) GetName() string {
 	return ""
 }
 
+type ListTasksRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The standard page size. Optional. If unspecified, the server will choose
+	// a suitable default. Values larger than 1000 will be truncated to 1000.
+	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// The standard page token. Optional. Get the values from responses to
+	// ListTasks.
+	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+}
+
+func (x *ListTasksRequest) Reset() {
+	*x = ListTasksRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_tasks_tasks_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListTasksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTasksRequest) ProtoMessage() {}
+
+func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_tasks_tasks_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTasksRequest.ProtoReflect.Descriptor instead.
+func (*ListTasksRequest) Descriptor() ([]byte, []int) {
+	return file_tasks_tasks_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ListTasksRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListTasksRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListTasksResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The tasks.
+	Tasks []*Task `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	// The token required to get the next page in a subsequent call to
+	// ListTasks.
+	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+}
+
+func (x *ListTasksResponse) Reset() {
+	*x = ListTasksResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_tasks_tasks_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListTasksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTasksResponse) ProtoMessage() {}
+
+func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_tasks_tasks_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTasksResponse.ProtoReflect.Descriptor instead.
+func (*ListTasksResponse) Descriptor() ([]byte, []int) {
+	return file_tasks_tasks_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ListTasksResponse) GetTasks() []*Task {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
+func (x *ListTasksResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 type CreateTaskRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -172,7 +289,7 @@ type CreateTaskRequest struct {
 func (x *CreateTaskRequest) Reset() {
 	*x = CreateTaskRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_tasks_tasks_proto_msgTypes[2]
+		mi := &file_tasks_tasks_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -185,7 +302,7 @@ func (x *CreateTaskRequest) String() string {
 func (*CreateTaskRequest) ProtoMessage() {}
 
 func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tasks_tasks_proto_msgTypes[2]
+	mi := &file_tasks_tasks_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -198,7 +315,7 @@ func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskRequest.ProtoReflect.Descriptor instead.
 func (*CreateTaskRequest) Descriptor() ([]byte, []int) {
-	return file_tasks_tasks_proto_rawDescGZIP(), []int{2}
+	return file_tasks_tasks_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateTaskRequest) GetTask() *Task {
@@ -221,7 +338,7 @@ type DeleteTaskRequest struct {
 func (x *DeleteTaskRequest) Reset() {
 	*x = DeleteTaskRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_tasks_tasks_proto_msgTypes[3]
+		mi := &file_tasks_tasks_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -234,7 +351,7 @@ func (x *DeleteTaskRequest) String() string {
 func (*DeleteTaskRequest) ProtoMessage() {}
 
 func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tasks_tasks_proto_msgTypes[3]
+	mi := &file_tasks_tasks_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -247,7 +364,7 @@ func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTaskRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTaskRequest) Descriptor() ([]byte, []int) {
-	return file_tasks_tasks_proto_rawDescGZIP(), []int{3}
+	return file_tasks_tasks_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DeleteTaskRequest) GetName() string {
@@ -278,17 +395,32 @@ var file_tasks_tasks_proto_rawDesc = []byte{
 	0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x0a, 0x63, 0x72,
 	0x65, 0x61, 0x74, 0x65, 0x54, 0x69, 0x6d, 0x65, 0x22, 0x24, 0x0a, 0x0e, 0x47, 0x65, 0x74, 0x54,
 	0x61, 0x73, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61,
-	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x22, 0x34,
+	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x22, 0x4e,
+	0x0a, 0x10, 0x4c, 0x69, 0x73, 0x74, 0x54, 0x61, 0x73, 0x6b, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x70, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x08, 0x70, 0x61, 0x67, 0x65, 0x53, 0x69, 0x7a, 0x65, 0x12,
+	0x1d, 0x0a, 0x0a, 0x70, 0x61, 0x67, 0x65, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x09, 0x70, 0x61, 0x67, 0x65, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x22, 0x5e,
+	0x0a, 0x11, 0x4c, 0x69, 0x73, 0x74, 0x54, 0x61, 0x73, 0x6b, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x12, 0x21, 0x0a, 0x05, 0x74, 0x61, 0x73, 0x6b, 0x73, 0x18, 0x01, 0x20, 0x03,
+	0x28, 0x0b, 0x32, 0x0b, 0x2e, 0x74, 0x61, 0x73, 0x6b, 0x73, 0x2e, 0x54, 0x61, 0x73, 0x6b, 0x52,
+	0x05, 0x74, 0x61, 0x73, 0x6b, 0x73, 0x12, 0x26, 0x0a, 0x0f, 0x6e, 0x65, 0x78, 0x74, 0x5f, 0x70,
+	0x61, 0x67, 0x65, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x0d, 0x6e, 0x65, 0x78, 0x74, 0x50, 0x61, 0x67, 0x65, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x22, 0x34,
 	0x0a, 0x11, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x61, 0x73, 0x6b, 0x52, 0x65, 0x71, 0x75,
 	0x65, 0x73, 0x74, 0x12, 0x1f, 0x0a, 0x04, 0x74, 0x61, 0x73, 0x6b, 0x18, 0x01, 0x20, 0x01, 0x28,
 	0x0b, 0x32, 0x0b, 0x2e, 0x74, 0x61, 0x73, 0x6b, 0x73, 0x2e, 0x54, 0x61, 0x73, 0x6b, 0x52, 0x04,
 	0x74, 0x61, 0x73, 0x6b, 0x22, 0x27, 0x0a, 0x11, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x54, 0x61,
 	0x73, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d,
-	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x32, 0xab, 0x01,
+	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x32, 0xeb, 0x01,
 	0x0a, 0x05, 0x54, 0x61, 0x73, 0x6b, 0x73, 0x12, 0x2d, 0x0a, 0x07, 0x47, 0x65, 0x74, 0x54, 0x61,
 	0x73, 0x6b, 0x12, 0x15, 0x2e, 0x74, 0x61, 0x73, 0x6b, 0x73, 0x2e, 0x47, 0x65, 0x74, 0x54, 0x61,
 	0x73, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0b, 0x2e, 0x74, 0x61, 0x73, 0x6b,
-	0x73, 0x2e, 0x54, 0x61, 0x73, 0x6b, 0x12, 0x33, 0x0a, 0x0a, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65,
+	0x73, 0x2e, 0x54, 0x61, 0x73, 0x6b, 0x12, 0x3e, 0x0a, 0x09, 0x4c, 0x69, 0x73, 0x74, 0x54, 0x61,
+	0x73, 0x6b, 0x73, 0x12, 0x17, 0x2e, 0x74, 0x61, 0x73, 0x6b, 0x73, 0x2e, 0x4c, 0x69, 0x73, 0x74,
+	0x54, 0x61, 0x73, 0x6b, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x18, 0x2e, 0x74,
+	0x61, 0x73, 0x6b, 0x73, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x54, 0x61, 0x73, 0x6b, 0x73, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x33, 0x0a, 0x0a, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65,
 	0x54, 0x61, 0x73, 0x6b, 0x12, 0x18, 0x2e, 0x74, 0x61, 0x73, 0x6b, 0x73, 0x2e, 0x43, 0x72, 0x65,
 	0x61, 0x74, 0x65, 0x54, 0x61, 0x73, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0b,
 	0x2e, 0x74, 0x61, 0x73, 0x6b, 0x73, 0x2e, 0x54, 0x61, 0x73, 0x6b, 0x12, 0x3e, 0x0a, 0x0a, 0x44,
@@ -313,29 +445,34 @@ func file_tasks_tasks_proto_rawDescGZIP() []byte {
 	return file_tasks_tasks_proto_rawDescData
 }
 
-var file_tasks_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_tasks_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_tasks_tasks_proto_goTypes = []interface{}{
 	(*Task)(nil),                  // 0: tasks.Task
 	(*GetTaskRequest)(nil),        // 1: tasks.GetTaskRequest
-	(*CreateTaskRequest)(nil),     // 2: tasks.CreateTaskRequest
-	(*DeleteTaskRequest)(nil),     // 3: tasks.DeleteTaskRequest
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),         // 5: google.protobuf.Empty
+	(*ListTasksRequest)(nil),      // 2: tasks.ListTasksRequest
+	(*ListTasksResponse)(nil),     // 3: tasks.ListTasksResponse
+	(*CreateTaskRequest)(nil),     // 4: tasks.CreateTaskRequest
+	(*DeleteTaskRequest)(nil),     // 5: tasks.DeleteTaskRequest
+	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),         // 7: google.protobuf.Empty
 }
 var file_tasks_tasks_proto_depIdxs = []int32{
-	4, // 0: tasks.Task.create_time:type_name -> google.protobuf.Timestamp
-	0, // 1: tasks.CreateTaskRequest.task:type_name -> tasks.Task
-	1, // 2: tasks.Tasks.GetTask:input_type -> tasks.GetTaskRequest
-	2, // 3: tasks.Tasks.CreateTask:input_type -> tasks.CreateTaskRequest
-	3, // 4: tasks.Tasks.DeleteTask:input_type -> tasks.DeleteTaskRequest
-	0, // 5: tasks.Tasks.GetTask:output_type -> tasks.Task
-	0, // 6: tasks.Tasks.CreateTask:output_type -> tasks.Task
-	5, // 7: tasks.Tasks.DeleteTask:output_type -> google.protobuf.Empty
-	5, // [5:8] is the sub-list for method output_type
-	2, // [2:5] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	6, // 0: tasks.Task.create_time:type_name -> google.protobuf.Timestamp
+	0, // 1: tasks.ListTasksResponse.tasks:type_name -> tasks.Task
+	0, // 2: tasks.CreateTaskRequest.task:type_name -> tasks.Task
+	1, // 3: tasks.Tasks.GetTask:input_type -> tasks.GetTaskRequest
+	2, // 4: tasks.Tasks.ListTasks:input_type -> tasks.ListTasksRequest
+	4, // 5: tasks.Tasks.CreateTask:input_type -> tasks.CreateTaskRequest
+	5, // 6: tasks.Tasks.DeleteTask:input_type -> tasks.DeleteTaskRequest
+	0, // 7: tasks.Tasks.GetTask:output_type -> tasks.Task
+	3, // 8: tasks.Tasks.ListTasks:output_type -> tasks.ListTasksResponse
+	0, // 9: tasks.Tasks.CreateTask:output_type -> tasks.Task
+	7, // 10: tasks.Tasks.DeleteTask:output_type -> google.protobuf.Empty
+	7, // [7:11] is the sub-list for method output_type
+	3, // [3:7] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_tasks_tasks_proto_init() }
@@ -369,7 +506,7 @@ func file_tasks_tasks_proto_init() {
 			}
 		}
 		file_tasks_tasks_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CreateTaskRequest); i {
+			switch v := v.(*ListTasksRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -381,6 +518,30 @@ func file_tasks_tasks_proto_init() {
 			}
 		}
 		file_tasks_tasks_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ListTasksResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_tasks_tasks_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CreateTaskRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_tasks_tasks_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*DeleteTaskRequest); i {
 			case 0:
 				return &v.state
@@ -399,7 +560,7 @@ func file_tasks_tasks_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_tasks_tasks_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -11,6 +11,9 @@ service Tasks {
     // Get a single task by name.
     rpc GetTask(GetTaskRequest) returns (Task);
 
+    // List tasks.
+    rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+
     // Create a new task.
     rpc CreateTask(CreateTaskRequest) returns (Task);
 
@@ -42,6 +45,25 @@ message GetTaskRequest {
     // The name.
     // Format: tasks/{task}
     string name = 1;
+}
+
+message ListTasksRequest {
+    // The standard page size. Optional. If unspecified, the server will choose
+    // a suitable default. Values larger than 1000 will be truncated to 1000.
+    int32 page_size = 1;
+
+    // The standard page token. Optional. Get the values from responses to
+    // ListTasks.
+    string page_token = 2;
+}
+
+message ListTasksResponse {
+    // The tasks.
+    repeated Task tasks = 1;
+
+    // The token required to get the next page in a subsequent call to
+    // ListTasks.
+    string next_page_token = 2;
 }
 
 message CreateTaskRequest {

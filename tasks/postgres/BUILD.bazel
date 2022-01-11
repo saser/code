@@ -1,1 +1,10 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
 exports_files(["schema.sql"])
+
+go_test(
+    name = "postgres_test",
+    srcs = ["schema_test.go"],
+    data = ["schema.sql"],
+    deps = ["//postgres/postgrestest"],
+)
