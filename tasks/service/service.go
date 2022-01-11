@@ -123,37 +123,17 @@ func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*e
 	}
 	errNotFound := errors.New("not found")
 	txFunc := func(tx pgx.Tx) error {
-		// Check first if the task exists. If not, we should return a
-		// codes.NotFound error. There's probably a more intelligent way of
-		// doing this by checking the output from the DELETE statement, but this
-		// is pretty straightforward and also a bit more defensive.
-		{
-			sql := strings.TrimSpace(`
-SELECT COUNT(*)
-	FROM tasks
-WHERE uuid = $1
-`)
-			var n int
-			err := tx.QueryRow(ctx, sql, id).Scan(&n)
-			if err != nil {
-				log.Print(err)
-				return err
-			}
-			if n != 1 {
-				return errNotFound
-			}
-		}
-		// Now that we know the task exists we can delete it.
-		{
-			sql := strings.TrimSpace(`
+		sql := strings.TrimSpace(`
 DELETE FROM tasks
 WHERE uuid = $1
 `)
-			_, err := tx.Exec(ctx, sql, id)
-			if err != nil {
-				log.Print(err)
-				return err
-			}
+		tag, err := tx.Exec(ctx, sql, id)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return errNotFound
 		}
 		return nil
 	}
