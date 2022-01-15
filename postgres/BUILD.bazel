@@ -1,7 +1,19 @@
 load("@io_bazel_rules_docker//container:image.bzl", "container_image")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 container_image(
     name = "image",
     base = "@postgres_image//image",
     visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "postgres",
+    srcs = ["postgres.go"],
+    importpath = "go.saser.se/postgres",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//postgres/log/glogadapter",
+        "@com_github_jackc_pgx_v4//pgxpool",
+    ],
 )

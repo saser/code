@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"go.saser.se/postgres"
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,10 +20,10 @@ import (
 type Service struct {
 	pb.UnimplementedTasksServer
 
-	pool *pgxpool.Pool
+	pool *postgres.Pool
 }
 
-func New(pool *pgxpool.Pool) *Service {
+func New(pool *postgres.Pool) *Service {
 	return &Service{
 		pool: pool,
 	}

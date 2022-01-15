@@ -8,6 +8,7 @@ require (
 	github.com/bazelbuild/rules_go v0.29.0
 	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/golang/glog v1.0.0
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v4 v4.14.1

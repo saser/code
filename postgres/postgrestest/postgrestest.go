@@ -9,10 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	"go.saser.se/docker/dockertest"
+	"go.saser.se/postgres"
 	"go.saser.se/runfiles"
 )
 
@@ -20,7 +19,7 @@ import (
 // "CREATE TABLE" statements and similar), and starts a new Docker container
 // running Postgres with the given schema. Open returns a connection pool to the
 // database in the container.
-func Open(ctx context.Context, tb testing.TB, schemaPath string) *pgxpool.Pool {
+func Open(ctx context.Context, tb testing.TB, schemaPath string) *postgres.Pool {
 	tb.Helper()
 	const (
 		user     = "postgrestest"
@@ -45,9 +44,13 @@ func Open(ctx context.Context, tb testing.TB, schemaPath string) *pgxpool.Pool {
 	id := dockertest.Run(ctx, tb, opts)
 	addr := dockertest.Address(ctx, tb, id, "5432/tcp")
 
-	// Connect, using exponential backoff, to the container.
+	// Connect to the container.
 	connString := fmt.Sprintf("postgres://%s:%s@%s/%s", user, password, addr, dbName)
-	pool := connectWithRetry(ctx, tb, connString)
+	pool, err := postgres.Open(ctx, connString)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	tb.Cleanup(pool.Close)
 
 	// Now that we have a connection we can run the schema script.
 	schemaSQL := string(runfiles.ReadT(tb, schemaPath))
@@ -58,26 +61,4 @@ func Open(ctx context.Context, tb testing.TB, schemaPath string) *pgxpool.Pool {
 	// The container is up and has the correct schema, and we are ready to
 	// return the connection pool to the caller.
 	return pool
-}
-
-// connectWithRetry uses linear backoff to connect using the given connString,
-// possibly trying multiple times. Retries are needed because the container
-// might not be ready to accept connections very soon after coming up.
-func connectWithRetry(ctx context.Context, tb testing.TB, connString string) *pgxpool.Pool {
-	tb.Helper()
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			tb.Fatal(ctx.Err())
-		case <-ticker.C:
-			pool, err := pgxpool.Connect(ctx, connString)
-			if err != nil {
-				continue
-			}
-			tb.Cleanup(pool.Close)
-			return pool
-		}
-	}
 }
