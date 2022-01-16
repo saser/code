@@ -475,6 +475,50 @@ func TestService_ListTasks_WithDeletions(t *testing.T) {
 	}
 }
 
+func TestService_ListTasks_WithAdditions(t *testing.T) {
+	ctx := context.Background()
+	c := setup(ctx, t)
+
+	tasks := c.CreateTasksT(ctx, t, []*pb.Task{
+		{Title: "Buy milk"},
+		{Title: "Do the laundry"},
+		{Title: "Get swole"},
+	})
+
+	firstPageSize := len(tasks) - 1
+
+	// Get the first page.
+	res := c.ListTasksT(ctx, t, &pb.ListTasksRequest{
+		PageSize: int32(firstPageSize), // Make sure we don't get everything.
+	})
+	wantFirstPage := tasks[:firstPageSize]
+	if diff := cmp.Diff(wantFirstPage, res.GetTasks(), protocmp.Transform(), protocmp.SortRepeated(taskLessFunc)); diff != "" {
+		t.Errorf("unexpected first page (-want +got)\n%s", diff)
+	}
+	token := res.GetNextPageToken()
+	if token == "" {
+		t.Fatalf("first page returned empty next_page_token")
+	}
+
+	// Add a new task.
+	tasks = append(tasks, c.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{Title: "Feed sourdough"},
+	}))
+
+	// Get the second page, which should contain the new task.
+	res = c.ListTasksT(ctx, t, &pb.ListTasksRequest{
+		PageSize:  int32(len(tasks)), // Try to make sure we get everything.
+		PageToken: token,
+	})
+	wantSecondPage := tasks[firstPageSize:]
+	if diff := cmp.Diff(wantSecondPage, res.GetTasks(), protocmp.Transform(), protocmp.SortRepeated(taskLessFunc)); diff != "" {
+		t.Errorf("unexpected second page (-want +got)\n%s", diff)
+	}
+	if got, want := res.GetNextPageToken(), ""; got != want {
+		t.Errorf("second page: next_page_token = %q; want %q", got, want)
+	}
+}
+
 func TestService_ListTasks_SamePageTokenTwice(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
