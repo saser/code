@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Masterminds/squirrel"
 	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
@@ -59,19 +59,23 @@ func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task
 	}
 	var createTime time.Time
 	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		sql := strings.TrimSpace(`
-SELECT
-    title,
-	description,
-	completed,
-	create_time
-FROM
-    tasks
-WHERE
-	id = $1
-	AND delete_time IS NULL
-`)
-		return tx.QueryRow(ctx, sql, id /* $1 */).Scan(
+		sql, args, err := postgres.StatementBuilder.
+			Select(
+				"title",
+				"description",
+				"completed",
+				"create_time",
+			).
+			From("tasks").
+			Where(squirrel.Eq{
+				"id":          id,
+				"delete_time": nil,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, sql, args...).Scan(
 			&task.Title,
 			&task.Description,
 			&task.Completed,
@@ -108,16 +112,17 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 			// We could do a SELECT and then a DELETE, but since Postgres
 			// supports the RETURNING clause, we can do it in just one
 			// statement. Neat!
-			sql := strings.TrimSpace(`
-DELETE
-FROM
-    page_tokens
-WHERE
-    token = $1
-RETURNING
-    minimum_id
-			`)
-			if err := tx.QueryRow(ctx, sql, token /* $1 */).Scan(&minID); err != nil {
+			sql, args, err := postgres.StatementBuilder.
+				Delete("page_tokens").
+				Where(squirrel.Eq{
+					"token": token,
+				}).
+				Suffix("RETURNING minimum_id").
+				ToSql()
+			if err != nil {
+				return err
+			}
+			if err := tx.QueryRow(ctx, sql, args...).Scan(&minID); err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					return errNoToken
 				}
@@ -142,22 +147,27 @@ RETURNING
 			// To use for the next page, if any.
 			nextMinID int64
 		)
-		tasksSQL := strings.TrimSpace(`
-SELECT
-    id,
-	title,
-	description,
-	completed,
-	create_time
-FROM
-    tasks
-WHERE
-    id >= $1
-	AND delete_time IS NULL
-ORDER BY
-    id ASC
-LIMIT $2
-		`)
+		sql, args, err := postgres.StatementBuilder.
+			Select(
+				"id",
+				"title",
+				"description",
+				"completed",
+				"create_time",
+			).
+			From("tasks").
+			Where(squirrel.GtOrEq{
+				"id": minID,
+			}).
+			Where(squirrel.Eq{
+				"delete_time": nil,
+			}).
+			OrderBy("id ASC").
+			Limit(uint64(pageSize) + 1).
+			ToSql()
+		if err != nil {
+			return err
+		}
 		// qf is called for every row returned by the above query, after
 		// scanning has completed successfully.
 		qf := func(qfr pgx.QueryFuncRow) error {
@@ -174,11 +184,8 @@ LIMIT $2
 			return nil
 		}
 		// Here is where the actual query happens.
-		_, err := tx.QueryFunc(ctx, tasksSQL,
-			[]interface{}{
-				minID,        // $1
-				pageSize + 1, // $2 -- see comment above about the +1 part.
-			},
+		if _, err := tx.QueryFunc(ctx, sql,
+			args,
 			[]interface{}{
 				&id,
 				&title,
@@ -187,8 +194,7 @@ LIMIT $2
 				&createTime,
 			},
 			qf,
-		)
-		if err != nil {
+		); err != nil {
 			return err
 		}
 
@@ -206,14 +212,15 @@ LIMIT $2
 		res.Tasks = tasks[:pageSize]
 		token := uuid.New()
 		res.NextPageToken = token.String()
-		tokenSQL := strings.TrimSpace(`
-INSERT INTO page_tokens (token, minimum_id)
-VALUES                  ($1,    $2        )
-		`)
-		if _, err := tx.Exec(ctx, tokenSQL,
-			token,     // $1
-			nextMinID, // $2
-		); err != nil {
+		sql, args, err = postgres.StatementBuilder.
+			Insert("page_tokens").
+			Columns("token", "minimum_id").
+			Values(token, nextMinID).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
 			return err
 		}
 		return nil
@@ -236,33 +243,30 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 	if task.GetCompleted() {
 		return nil, status.Error(codes.InvalidArgument, "The task must not already be completed.")
 	}
-	err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		sql := strings.TrimSpace(`
-INSERT INTO tasks (title, description, completed, create_time)
-VALUES            ($1,    $2,          $3,        NOW()      )
-RETURNING id, create_time
-`)
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		sql, args, err := postgres.StatementBuilder.
+			Insert("tasks").
+			Columns("title", "description", "completed", "create_time").
+			Values(task.GetTitle(), task.GetDescription(), task.GetCompleted(), "NOW()").
+			Suffix("RETURNING id, create_time").
+			ToSql()
+		if err != nil {
+			return err
+		}
 		var (
 			id         int64
 			createTime time.Time
 		)
-		err := tx.QueryRow(ctx, sql,
-			task.GetTitle(),       // $1
-			task.GetDescription(), // $2
-			task.GetCompleted(),   // $3
-		).Scan(
+		if err := tx.QueryRow(ctx, sql, args...).Scan(
 			&id,
 			&createTime,
-		)
-		if err != nil {
-			log.Print(err)
-		} else {
-			task.Name = "tasks/" + fmt.Sprint(id)
-			task.CreateTime = timestamppb.New(createTime)
+		); err != nil {
+			return err
 		}
-		return err
-	})
-	if err != nil {
+		task.Name = "tasks/" + fmt.Sprint(id)
+		task.CreateTime = timestamppb.New(createTime)
+		return nil
+	}); err != nil {
 		return nil, internalError
 	}
 	return task, nil
@@ -282,17 +286,19 @@ func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*e
 	}
 	errNotFound := errors.New("not found")
 	txFunc := func(tx pgx.Tx) error {
-		sql := strings.TrimSpace(`
-UPDATE tasks
-SET
-    delete_time = NOW()
-WHERE
-    id = $1
-	AND delete_time IS NULL
-`)
-		tag, err := tx.Exec(ctx, sql, id /* $1 */)
+		sql, args, err := postgres.StatementBuilder.
+			Update("tasks").
+			Set("delete_time", "NOW()").
+			Where(squirrel.Eq{
+				"id":          id,
+				"delete_time": nil,
+			}).
+			ToSql()
 		if err != nil {
-			log.Print(err)
+			return err
+		}
+		tag, err := tx.Exec(ctx, sql, args...)
+		if err != nil {
 			return err
 		}
 		if tag.RowsAffected() == 0 {
