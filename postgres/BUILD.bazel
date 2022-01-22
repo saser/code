@@ -15,5 +15,6 @@ go_library(
     deps = [
         "//postgres/log/glogadapter",
         "@com_github_jackc_pgx_v4//pgxpool",
+        "@com_github_masterminds_squirrel//:squirrel",
     ],
 )

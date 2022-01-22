@@ -3,6 +3,7 @@ module go.saser.se
 go 1.17
 
 require (
+	github.com/Masterminds/squirrel v1.5.2
 	github.com/bazelbuild/bazelisk v1.11.0
 	github.com/bazelbuild/buildtools v0.0.0-20211129135157-cdedcc0318b9
 	github.com/bazelbuild/rules_go v0.29.0
@@ -34,6 +35,8 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgtype v1.9.1 // indirect
 	github.com/jackc/puddle v1.2.0 // indirect
+	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
+	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect

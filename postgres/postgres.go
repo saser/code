@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.saser.se/postgres/log/glogadapter"
 )
 
 const retryInterval = 1 * time.Second
+
+// StatementBuilder is ready to use for PostgreSQL queries.
+var StatementBuilder = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 
 // Pool contains a connection pool to a Postgres database.
 type Pool struct {

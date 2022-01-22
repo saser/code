@@ -1126,6 +1126,19 @@ def go_repositories():
         version = "v0.2.0",
     )
     go_repository(
+        name = "com_github_lann_builder",
+        importpath = "github.com/lann/builder",
+        sum = "h1:SOEGU9fKiNWd/HOJuq6+3iTQz8KNCLtVX6idSoTLdUw=",
+        version = "v0.0.0-20180802200727-47ae307949d0",
+    )
+    go_repository(
+        name = "com_github_lann_ps",
+        importpath = "github.com/lann/ps",
+        sum = "h1:P6pPBnrTSX3DEVR4fDembhRWSsG5rVo6hYhAB/ADZrk=",
+        version = "v0.0.0-20150810152359-62de8c46ede0",
+    )
+
+    go_repository(
         name = "com_github_lib_pq",
         importpath = "github.com/lib/pq",
         sum = "h1:AqzbZs4ZoCBp+GtejcpCpcxM3zlSMx29dXbUSeVtJb8=",
@@ -1156,6 +1169,13 @@ def go_repositories():
         sum = "h1:hLg3sBzpNErnxhQtUy/mmLR2I9foDujNK030IGemrRc=",
         version = "v3.1.1",
     )
+    go_repository(
+        name = "com_github_masterminds_squirrel",
+        importpath = "github.com/Masterminds/squirrel",
+        sum = "h1:UiOEi2ZX4RCSkpiNDQN5kro/XIBpSRk9iTqdIRPzUXE=",
+        version = "v1.5.2",
+    )
+
     go_repository(
         name = "com_github_mattn_go_colorable",
         importpath = "github.com/mattn/go-colorable",
