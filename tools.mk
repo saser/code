@@ -1,6 +1,6 @@
 # tools.mk: rules for installing tools used by this project.
 
-root := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+root := $(dir $(lastword $(MAKEFILE_LIST)))
 
 # The underscore is to prevent the `go` command from considering any Go files that may exist in
 # downloaded third-party dependencies.
@@ -18,7 +18,7 @@ $(bazelisk): go.mod $(tools)
 
 # buildifier: a formatter and linter for BUILD.bazel files.
 buildifier := $(tools)/buildifier
-$(buildifier): go.mod
+$(buildifier): go.mod $(tools)
 	go \
 		build \
 		-o='$@' \
@@ -26,7 +26,7 @@ $(buildifier): go.mod
 
 # gofumpt: a stricter subset of gofmt.
 gofumpt := $(tools)/gofumpt
-$(gofumpt): go.mod
+$(gofumpt): go.mod $(tools)
 	go \
 		build \
 		-o='$@' \
@@ -53,7 +53,7 @@ $(protoc): $(protoc_dir)
 
 # protoc-gen-go: the protoc plugin for generating Go code from protobufs.
 protoc-gen-go := $(tools)/protoc-gen-go
-$(protoc-gen-go): go.mod
+$(protoc-gen-go): go.mod $(tools)
 	go \
 		build \
 		-o='$@' \
@@ -61,7 +61,7 @@ $(protoc-gen-go): go.mod
 
 # protoc-gen-go-grpc: the protoc plugin for generating gRPC-Go code from protobufs.
 protoc-gen-go-grpc := $(tools)/protoc-gen-go-grpc
-$(protoc-gen-go-grpc): go.mod
+$(protoc-gen-go-grpc): go.mod $(tools)
 	go \
 		build \
 		-o='$@' \
