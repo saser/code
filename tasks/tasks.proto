@@ -3,6 +3,7 @@ syntax = "proto3";
 package tasks;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "go.saser.se/tasks/tasks_go_proto";
@@ -16,6 +17,9 @@ service Tasks {
 
     // Create a new task.
     rpc CreateTask(CreateTaskRequest) returns (Task);
+
+    // Update a single task.
+    rpc UpdateTask(UpdateTaskRequest) returns (Task);
 
     // Delete a task by name.
     rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
@@ -71,6 +75,21 @@ message CreateTaskRequest {
     // field must not be empty, and the `completed` field, if specified, must be
     // false.
     Task task = 1;
+}
+
+message UpdateTaskRequest {
+    // The task to be updated. The `name` field is used to specify which task to
+    // update. Only fields with non-default values will be updated, as long as
+    // they are specified in `update_mask`.
+    //
+    // Note that trying to update the `completed` field is an error -- there are
+    // separate RPCs for that.
+    Task task = 1;
+
+    // A field mask of which fields to update. A nil or empty field mask will be
+    // interpreted as updating all fields specified in `task`. Specifying a
+    // single `*` means doing a full replacement of the task.
+    google.protobuf.FieldMask update_mask = 2;
 }
 
 message DeleteTaskRequest {

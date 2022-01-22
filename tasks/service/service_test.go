@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 func taskLessFunc(t1, t2 *pb.Task) bool {
@@ -79,6 +80,15 @@ func (c *testClient) CreateTasksT(ctx context.Context, t *testing.T, tasks []*pb
 		}))
 	}
 	return created
+}
+
+func (c *testClient) UpdateTaskT(ctx context.Context, t *testing.T, req *pb.UpdateTaskRequest) *pb.Task {
+	t.Helper()
+	task, err := c.UpdateTask(ctx, req)
+	if err != nil {
+		t.Fatalf("UpdateTask(%v) err = %v; want nil", req, err)
+	}
+	return task
 }
 
 func (c *testClient) DeleteTaskT(ctx context.Context, t *testing.T, req *pb.DeleteTaskRequest) {
@@ -629,6 +639,357 @@ func TestService_CreateTask_Error(t *testing.T) {
 				t.Logf("err = %v", err)
 			}
 		})
+	}
+}
+
+func TestService_UpdateTask(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, tt := range []struct {
+		name string
+		task *pb.Task
+		req  *pb.UpdateTaskRequest // will be updated in-place with the created task name
+		want *pb.Task              // will be updated in-place with the creation time
+	}{
+		{
+			name: "EmptyUpdate_NilUpdateMask",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task:       &pb.Task{},
+				UpdateMask: nil,
+			},
+			want: &pb.Task{
+				Title: "Before the update",
+			},
+		},
+		{
+			name: "EmptyUpdate_EmptyUpdateMask",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task:       &pb.Task{},
+				UpdateMask: &fieldmaskpb.FieldMask{},
+			},
+			want: &pb.Task{
+				Title: "Before the update",
+			},
+		},
+		{
+			name: "UpdateTitle_NilUpdateMask",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task:       &pb.Task{Title: "After the update"},
+				UpdateMask: nil,
+			},
+			want: &pb.Task{
+				Title: "After the update",
+			},
+		},
+		{
+			name: "UpdateTitle_EmptyUpdateMask",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task:       &pb.Task{Title: "After the update"},
+				UpdateMask: &fieldmaskpb.FieldMask{},
+			},
+			want: &pb.Task{
+				Title: "After the update",
+			},
+		},
+		{
+			name: "UpdateTitle_MultipleFieldsPresent",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Title:       "After the update",
+					Description: "You should never see this",
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"title"},
+				},
+			},
+			want: &pb.Task{
+				Title: "After the update",
+			},
+		},
+		{
+			name: "UpdateMultipleFields_NilUpdateMask",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Title:       "After the update",
+					Description: "Added a description",
+				},
+				UpdateMask: nil,
+			},
+			want: &pb.Task{
+				Title:       "After the update",
+				Description: "Added a description",
+			},
+		},
+		{
+			name: "UpdateMultipleFields_EmptyUpdateMask",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Title:       "After the update",
+					Description: "Added a description",
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{},
+			},
+			want: &pb.Task{
+				Title:       "After the update",
+				Description: "Added a description",
+			},
+		},
+		{
+			name: "UpdateMultipleFields_NonEmptyUpdateMask",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Title:       "After the update",
+					Description: "Added a description",
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{
+						"title",
+						"description",
+					},
+				},
+			},
+			want: &pb.Task{
+				Title:       "After the update",
+				Description: "Added a description",
+			},
+		},
+		{
+			name: "UpdateMultipleFields_StarMask",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Title:       "After the update",
+					Description: "Added a description",
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"*"},
+				},
+			},
+			want: &pb.Task{
+				Title:       "After the update",
+				Description: "Added a description",
+			},
+		},
+		{
+			// An empty/default value for `description` with a wildcard update
+			// mask shoul result in description being cleared.
+			name: "RemoveDescription",
+			task: &pb.Task{
+				Title:       "Before the update",
+				Description: "This is a description",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Title:       "After the update",
+					Description: "",
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"*"},
+				},
+			},
+			want: &pb.Task{
+				Title:       "After the update",
+				Description: "",
+			},
+		},
+	} {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			c := setup(ctx, t)
+			task := c.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+				Task: tt.task,
+			})
+			tt.req.Task.Name = task.GetName()
+			tt.want.CreateTime = task.GetCreateTime()
+			got := c.UpdateTaskT(ctx, t, tt.req)
+			if diff := cmp.Diff(tt.want, got, protocmp.Transform(), protocmp.IgnoreFields(got, "name")); diff != "" {
+				t.Errorf("unexpected result of update (-want +got)\n%s", diff)
+			}
+			// Getting the task again should produce the same result as after
+			// the update.
+			got = c.GetTaskT(ctx, t, &pb.GetTaskRequest{
+				Name: task.GetName(),
+			})
+			if diff := cmp.Diff(tt.want, got, protocmp.Transform(), protocmp.IgnoreFields(got, "name")); diff != "" {
+				t.Errorf("unexpected result of GetTask after update (-want +got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestService_UpdateTask_Error(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := setup(ctx, t)
+	task := c.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:       "Some task",
+			Description: "That also has a description",
+		},
+	})
+
+	for _, tt := range []struct {
+		name string
+		req  *pb.UpdateTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "NoName",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name:  "",
+					Title: "I want to change the title",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "InvalidName",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name:  "invalidlolol/123",
+					Title: "I want to change the title",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "NotFound",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name:  "tasks/123",
+					Title: "I want to change the title",
+				},
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "InvalidFieldInUpdateMask",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name:  task.GetName(),
+					Title: "I want to change the title",
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"title_invalid"},
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "BothFieldsAndWildcardInUpdateMask",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name:  task.GetName(),
+					Title: "I want to change the title",
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{
+						"title",
+						"*",
+					},
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			// Updating a name doesn't really make sense and we could just
+			// ignore it, but it's better to return an error to make a user
+			// aware of it.
+			name: "UpdateName",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name: task.GetName(),
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"name"},
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "UpdateCompleted",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name:      task.GetName(),
+					Completed: true,
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"completed"},
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := c.UpdateTask(ctx, tt.req)
+			if got := status.Code(err); got != tt.want {
+				t.Errorf("UpdateTask(%v) code = %v; want %v", tt.req, got, tt.want)
+				t.Logf("err = %v", err)
+			}
+
+			// After the failed update the task should be intact.
+			got := c.GetTaskT(ctx, t, &pb.GetTaskRequest{
+				Name: task.GetName(),
+			})
+			if diff := cmp.Diff(task, got, protocmp.Transform()); diff != "" {
+				t.Errorf("unexpected task after failed update (-want +got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestService_UpdateTask_AfterDeletion(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := setup(ctx, t)
+	task := c.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:       "A task that will be deleted",
+			Description: "This task is not long for this world",
+		},
+	})
+	c.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+		Name: task.GetName(),
+	})
+
+	req := &pb.UpdateTaskRequest{
+		Task: &pb.Task{
+			Name:  task.GetName(),
+			Title: "You should never see this",
+		},
+	}
+	updated, err := c.UpdateTask(ctx, req)
+	if got, want := status.Code(err), codes.NotFound; got != want {
+		t.Errorf("after deletion: UpdateTask(%v) code = %v; want %v", req, got, want)
+		t.Logf("after deletion: returned task: %v", updated)
 	}
 }
 

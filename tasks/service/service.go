@@ -16,7 +16,9 @@ import (
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -29,6 +31,21 @@ const maxPageSize = 1000
 // request, and where the error cannot be attributed to the user making an
 // invalid request, something cannot be found, etc.
 var internalError = status.Error(codes.Internal, "Something went wrong.")
+
+// updatableMask contains the fields that can be updated by UpdateTask. It must
+// be kept in sync with the proto definition.
+var updatableMask *fieldmaskpb.FieldMask
+
+func init() {
+	m, err := fieldmaskpb.New(&pb.Task{},
+		"title",
+		"description",
+	)
+	if err != nil {
+		glog.Exit(err)
+	}
+	updatableMask = m
+}
 
 type Service struct {
 	pb.UnimplementedTasksServer
@@ -54,40 +71,20 @@ func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
-	task := &pb.Task{
-		Name: name,
-	}
-	var createTime time.Time
+	var task *pb.Task
 	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		sql, args, err := postgres.StatementBuilder.
-			Select(
-				"title",
-				"description",
-				"completed",
-				"create_time",
-			).
-			From("tasks").
-			Where(squirrel.Eq{
-				"id":          id,
-				"delete_time": nil,
-			}).
-			ToSql()
+		t, err := taskByID(ctx, tx, id)
 		if err != nil {
 			return err
 		}
-		return tx.QueryRow(ctx, sql, args...).Scan(
-			&task.Title,
-			&task.Description,
-			&task.Completed,
-			&createTime,
-		)
+		task = t
+		return nil
 	}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 		}
 		return nil, internalError
 	}
-	task.CreateTime = timestamppb.New(createTime)
 	return task, nil
 }
 
@@ -272,6 +269,115 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 	return task, nil
 }
 
+func (s *Service) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.Task, error) {
+	// First we do stateless validation, i.e., look for errors that we can find
+	// by only looking at the request message.
+	patch := req.GetTask()
+	name := patch.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if !strings.HasPrefix(name, "tasks/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(name, "tasks/"), 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	updateMask := req.GetUpdateMask()
+	if updateMask == nil {
+		// This is not really necessary, but makes downstream handling easier by
+		// not having to be careful about nil derefs.
+		updateMask = &fieldmaskpb.FieldMask{}
+	}
+	// Handle two special cases:
+	// 1. The update mask is nil or empty. Then it should be equivalent to
+	//    updating all non-empty fields in the patch.
+	// 2. The update mask contains a single path that is the wildcard ("*").
+	// 	  Then it should be treated as specifying all updatable paths.
+	switch paths := updateMask.GetPaths(); {
+	case len(paths) == 0:
+		glog.Error("empty paths")
+		if v := patch.GetTitle(); v != "" {
+			updateMask.Paths = append(updateMask.GetPaths(), "title")
+		}
+		if v := patch.GetDescription(); v != "" {
+			updateMask.Paths = append(updateMask.GetPaths(), "description")
+		}
+	case len(paths) == 1 && paths[0] == "*":
+		updateMask = proto.Clone(updatableMask).(*fieldmaskpb.FieldMask)
+	}
+	for _, path := range updateMask.GetPaths() {
+		switch path {
+		case "completed", "create_time", "name":
+			return nil, status.Errorf(codes.InvalidArgument, "The field %q cannot be updated with UpdateTask.")
+		case "*":
+			// We handled the only valid case of giving a wildcard path above,
+			// i.e., when it is the only path.
+			return nil, status.Error(codes.InvalidArgument, "A wildcard can only be used if it is the single path in the update mask.")
+		}
+	}
+	if updateMask != nil && !updateMask.IsValid(&pb.Task{}) {
+		return nil, status.Error(codes.InvalidArgument, "The given update mask is invalid.")
+	}
+	// At this point we know that updateMask is not empty and is a valid mask.
+	// The path(s) fully specify what we should get from the patch. It may still
+	// be the case that the patch is empty.
+
+	updatedTask := &pb.Task{
+		Name: name,
+	}
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		// Special case: the patch is empty so we should just return the current
+		// version of the task.
+		if proto.Equal(patch, &pb.Task{Name: name} /* empty patch except for the name */) {
+			var err error
+			updatedTask, err = taskByID(ctx, tx, id)
+			return err
+		}
+		// Update only the columns corresponding to the fields in the patch.
+		q := postgres.StatementBuilder.
+			Update("tasks").
+			Where(squirrel.Eq{
+				"id":          id,
+				"delete_time": nil,
+			})
+		for _, path := range updateMask.GetPaths() {
+			switch path {
+			case "title":
+				q = q.Set("title", patch.GetTitle())
+			case "description":
+				q = q.Set("description", patch.GetDescription())
+			}
+		}
+		q = q.Suffix("RETURNING title, description, completed, create_time")
+
+		sql, args, err := q.ToSql()
+		if err != nil {
+			return err
+		}
+		var createTime time.Time
+		if err := tx.QueryRow(ctx, sql, args...).Scan(
+			&updatedTask.Title,
+			&updatedTask.Description,
+			&updatedTask.Completed,
+			&createTime,
+		); err != nil {
+			return err
+		}
+		updatedTask.CreateTime = timestamppb.New(createTime)
+		return nil
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", patch.GetName())
+		}
+		glog.Error(err)
+		return nil, internalError
+	}
+
+	return updatedTask, nil
+}
+
 func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*emptypb.Empty, error) {
 	name := req.GetName()
 	if name == "" {
@@ -313,4 +419,41 @@ func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*e
 		return nil, internalError
 	}
 	return &emptypb.Empty{}, nil
+}
+
+// taskByID the database within the given transaction for the task with the
+// given ID. Any errors from database driver is returned. For example, if no
+// task is found by the given ID, pgx.ErrNoRows is returned, and callers should
+// check for it using errors.Is.
+func taskByID(ctx context.Context, tx pgx.Tx, id int64) (*pb.Task, error) {
+	task := &pb.Task{
+		Name: "tasks/" + fmt.Sprint(id),
+	}
+	var createTime time.Time
+	sql, args, err := postgres.StatementBuilder.
+		Select(
+			"title",
+			"description",
+			"completed",
+			"create_time",
+		).
+		From("tasks").
+		Where(squirrel.Eq{
+			"id":          id,
+			"delete_time": nil,
+		}).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.QueryRow(ctx, sql, args...).Scan(
+		&task.Title,
+		&task.Description,
+		&task.Completed,
+		&createTime,
+	); err != nil {
+		return nil, err
+	}
+	task.CreateTime = timestamppb.New(createTime)
+	return task, nil
 }

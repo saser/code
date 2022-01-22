@@ -29,6 +29,8 @@ type TasksClient interface {
 	ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
 	// Create a new task.
 	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Update a single task.
+	UpdateTask(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*Task, error)
 	// Delete a task by name.
 	DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -68,6 +70,15 @@ func (c *tasksClient) CreateTask(ctx context.Context, in *CreateTaskRequest, opt
 	return out, nil
 }
 
+func (c *tasksClient) UpdateTask(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*Task, error) {
+	out := new(Task)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/UpdateTask", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *tasksClient) DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/tasks.Tasks/DeleteTask", in, out, opts...)
@@ -87,6 +98,8 @@ type TasksServer interface {
 	ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
 	// Create a new task.
 	CreateTask(context.Context, *CreateTaskRequest) (*Task, error)
+	// Update a single task.
+	UpdateTask(context.Context, *UpdateTaskRequest) (*Task, error)
 	// Delete a task by name.
 	DeleteTask(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTasksServer()
@@ -104,6 +117,9 @@ func (UnimplementedTasksServer) ListTasks(context.Context, *ListTasksRequest) (*
 }
 func (UnimplementedTasksServer) CreateTask(context.Context, *CreateTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateTask not implemented")
+}
+func (UnimplementedTasksServer) UpdateTask(context.Context, *UpdateTaskRequest) (*Task, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateTask not implemented")
 }
 func (UnimplementedTasksServer) DeleteTask(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteTask not implemented")
@@ -175,6 +191,24 @@ func _Tasks_CreateTask_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Tasks_UpdateTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).UpdateTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/UpdateTask",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).UpdateTask(ctx, req.(*UpdateTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Tasks_DeleteTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteTaskRequest)
 	if err := dec(in); err != nil {
@@ -211,6 +245,10 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateTask",
 			Handler:    _Tasks_CreateTask_Handler,
+		},
+		{
+			MethodName: "UpdateTask",
+			Handler:    _Tasks_UpdateTask_Handler,
 		},
 		{
 			MethodName: "DeleteTask",
