@@ -1,4 +1,4 @@
 #!/bin/bash
 
-make _tools/bazelisk
-exec _tools/bazelisk "$@"
+make "$(pwd)/_tools/bazelisk"
+exec "$(pwd)/_tools/bazelisk" "$@"
