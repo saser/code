@@ -297,7 +297,6 @@ func (s *Service) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*p
 	// 	  Then it should be treated as specifying all updatable paths.
 	switch paths := updateMask.GetPaths(); {
 	case len(paths) == 0:
-		glog.Error("empty paths")
 		if v := patch.GetTitle(); v != "" {
 			updateMask.Paths = append(updateMask.GetPaths(), "title")
 		}
