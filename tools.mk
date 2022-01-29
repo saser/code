@@ -10,7 +10,7 @@ $(tools):
 
 # bazelisk: a script to run Bazel with a given version.
 bazelisk := $(tools)/bazelisk
-$(bazelisk): go.mod $(tools)
+$(bazelisk): go.mod | $(tools)
 	go \
 		build \
 		-o='$@' \
@@ -18,7 +18,7 @@ $(bazelisk): go.mod $(tools)
 
 # buildifier: a formatter and linter for BUILD.bazel files.
 buildifier := $(tools)/buildifier
-$(buildifier): go.mod $(tools)
+$(buildifier): go.mod | $(tools)
 	go \
 		build \
 		-o='$@' \
@@ -26,7 +26,7 @@ $(buildifier): go.mod $(tools)
 
 # gofumpt: a stricter subset of gofmt.
 gofumpt := $(tools)/gofumpt
-$(gofumpt): go.mod $(tools)
+$(gofumpt): go.mod | $(tools)
 	go \
 		build \
 		-o='$@' \
@@ -35,7 +35,7 @@ $(gofumpt): go.mod $(tools)
 # protoc: the protobuf compiler.
 protoc_version := 3.19.1
 protoc_archive := $(tools)/protoc_$(protoc_version).zip
-$(protoc_archive): $(tools)
+$(protoc_archive): | $(tools)
 	curl \
 		--fail \
 		--location \
@@ -53,7 +53,7 @@ $(protoc): $(protoc_dir)
 
 # protoc-gen-go: the protoc plugin for generating Go code from protobufs.
 protoc-gen-go := $(tools)/protoc-gen-go
-$(protoc-gen-go): go.mod $(tools)
+$(protoc-gen-go): go.mod | $(tools)
 	go \
 		build \
 		-o='$@' \
@@ -61,7 +61,7 @@ $(protoc-gen-go): go.mod $(tools)
 
 # protoc-gen-go-grpc: the protoc plugin for generating gRPC-Go code from protobufs.
 protoc-gen-go-grpc := $(tools)/protoc-gen-go-grpc
-$(protoc-gen-go-grpc): go.mod $(tools)
+$(protoc-gen-go-grpc): go.mod | $(tools)
 	go \
 		build \
 		-o='$@' \
