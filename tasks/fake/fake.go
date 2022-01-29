@@ -9,14 +9,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/google/uuid"
+	"github.com/jonboulle/clockwork"
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -46,14 +47,22 @@ func init() {
 	updatableMask = m
 }
 
+type pageToken struct {
+	MinimumID   int
+	ShowDeleted bool
+}
+
 // Fake implements the Tasks service using only in-memory data structures.
 type Fake struct {
 	pb.UnimplementedTasksServer
 
 	mu         sync.Mutex
 	nextID     int
-	tasks      []*pb.Task     // a nil element corresponds to a deleted task
-	pageTokens map[string]int // token (UUID) -> index into `tasks` of task with minimum ID
+	tasks      []*pb.Task
+	pageTokens map[string]pageToken // token (UUID) -> minimum ID and whether to show deleted
+
+	// Only used in testing. Nil otherwise.
+	clock clockwork.FakeClock
 }
 
 // New creates a new Fake ready to use.
@@ -61,7 +70,7 @@ func New() *Fake {
 	return &Fake{
 		nextID:     1,
 		tasks:      nil,
-		pageTokens: make(map[string]int),
+		pageTokens: make(map[string]pageToken),
 	}
 }
 
@@ -85,7 +94,7 @@ func (f *Fake) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task, e
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	task := f.tasks[id-1]
-	if task == nil {
+	if expiry := task.GetExpiryTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	return proto.Clone(task).(*pb.Task), nil
@@ -105,20 +114,28 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 
 	minID := 1
 	if token := req.GetPageToken(); token != "" {
-		var ok bool
-		minID, ok = f.pageTokens[token]
+		pt, ok := f.pageTokens[token]
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
 		}
+		if req.GetShowDeleted() != pt.ShowDeleted {
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+		}
+		minID = pt.MinimumID
 		delete(f.pageTokens, token)
 	}
 
 	// Start adding tasks that we will return.
 	res := &pb.ListTasksResponse{}
 	for i := minID - 1; i < len(f.tasks) && len(res.GetTasks()) <= int(pageSize); i++ {
-		if task := f.tasks[i]; task != nil {
-			res.Tasks = append(res.GetTasks(), proto.Clone(task).(*pb.Task))
+		task := f.tasks[i]
+		if expiry := task.GetExpiryTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
+			continue
 		}
+		if task.GetDeleteTime().IsValid() && !req.GetShowDeleted() {
+			continue
+		}
+		res.Tasks = append(res.GetTasks(), proto.Clone(task).(*pb.Task))
 	}
 
 	// If there is one extra task, use it to create a new page token.
@@ -132,7 +149,10 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 			return nil, internalError
 		}
 		token := uuid.NewString()
-		f.pageTokens[token] = nextMinID
+		f.pageTokens[token] = pageToken{
+			MinimumID:   nextMinID,
+			ShowDeleted: req.GetShowDeleted(),
+		}
 		res.NextPageToken = token
 	}
 	return res, nil
@@ -152,7 +172,7 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 	id := f.nextID
 	f.nextID++
 	created.Name = "tasks/" + fmt.Sprint(id)
-	created.CreateTime = timestamppb.Now()
+	created.CreateTime = timestamppb.New(f.now())
 	f.tasks = append(f.tasks, created)
 	return created, nil
 }
@@ -219,7 +239,7 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	task := f.tasks[idx]
-	if task == nil {
+	if task.GetDeleteTime().IsValid() {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	task = proto.Clone(task).(*pb.Task)
@@ -235,7 +255,33 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 	return task, nil
 }
 
-func (f *Fake) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*emptypb.Empty, error) {
+func (f *Fake) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*pb.Task, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if !strings.HasPrefix(name, "tasks/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(name, "tasks/"), 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	deleted := f.tasks[id-1]
+	if deleted.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	now := f.now()
+	deleted.DeleteTime = timestamppb.New(now)
+	deleted.ExpiryTime = timestamppb.New(now.AddDate(0 /*years*/, 0 /*months*/, 30 /*days*/))
+	return proto.Clone(deleted).(*pb.Task), nil
+}
+
+func (f *Fake) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest) (*pb.Task, error) {
 	name := req.GetName()
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
@@ -252,9 +298,23 @@ func (f *Fake) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*empt
 	defer f.mu.Unlock()
 
 	idx := id - 1
-	if f.tasks[idx] == nil {
+	if int(idx) >= len(f.tasks) {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
-	f.tasks[idx] = nil
-	return &emptypb.Empty{}, nil
+	task := f.tasks[idx]
+	if !task.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.AlreadyExists, "A task with name %q already exists.", name)
+	}
+	task.DeleteTime = nil
+	task.ExpiryTime = nil
+	return proto.Clone(task).(*pb.Task), nil
+}
+
+// now returns time.Now() except if f.clock is non-nil, then that clock is used
+// instead. now assumes that the mutex is held when called.
+func (f *Fake) now() time.Time {
+	if f.clock != nil {
+		return f.clock.Now()
+	}
+	return time.Now()
 }

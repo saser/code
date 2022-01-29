@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/suite"
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc/codes"
@@ -25,6 +27,7 @@ type Suite struct {
 
 	client      *testClient
 	truncater   Truncater
+	clock       clockwork.FakeClock
 	maxPageSize int
 }
 
@@ -39,10 +42,11 @@ type Truncater interface {
 
 // New constructs a new test suite. The truncater should be connected to the
 // same data stores as the implementation under test.
-func New(client pb.TasksClient, truncater Truncater, maxPageSize int) *Suite {
+func New(client pb.TasksClient, truncater Truncater, clock clockwork.FakeClock, maxPageSize int) *Suite {
 	return &Suite{
 		client:      &testClient{TasksClient: client},
 		truncater:   truncater,
+		clock:       clock,
 		maxPageSize: maxPageSize,
 	}
 }
@@ -110,20 +114,30 @@ func (s *Suite) TestGetTask_AfterDeletion() {
 		}
 	}
 
-	// After deleting the task, getting the task by name should produce a "not
-	// found" error.
+	// After soft deleting the task, getting the task by name should succeed and
+	// produce the same task.
 	{
-		s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+		want := s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
 			Name: task.GetName(),
 		})
-
-		req := &pb.GetTaskRequest{
+		task = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
 			Name: task.GetName(),
+		})
+		if diff := cmp.Diff(want, task, protocmp.Transform()); diff != "" {
+			t.Errorf("GetTask: unexpected result of getting soft deleted task (-want +got)\n%s", diff)
 		}
-		_, err := s.client.GetTask(ctx, req)
-		if got, want := status.Code(err), codes.NotFound; got != want {
-			t.Errorf("GetTask(%v) code = %v; want %v", req, got, want)
-		}
+	}
+
+	// After the task has expired we shouldn't be able to get it anymore.
+	s.clock.Advance(task.GetExpiryTime().AsTime().Sub(s.clock.Now()))
+	s.clock.Advance(1 * time.Minute)
+	req := &pb.GetTaskRequest{
+		Name: task.GetName(),
+	}
+	_, err := s.client.GetTask(ctx, req)
+	if got, want := status.Code(err), codes.NotFound; got != want {
+		t.Errorf("after expiration: GetTask(%v) code = %v; want %v", req, got, want)
+		t.Logf("err = %v", err)
 	}
 }
 
@@ -397,6 +411,48 @@ func (s *Suite) TestListTasks_WithDeletions() {
 	}
 }
 
+func (s *Suite) TestListTasks_WithDeletions_ShowDeleted() {
+	t := s.T()
+	ctx := context.Background()
+
+	want := s.client.CreateTasksT(ctx, t, []*pb.Task{
+		{Title: "Buy milk"},
+		{Title: "Do the laundry"},
+		{Title: "Get swole"},
+	})
+
+	// Soft delete one of the tasks.
+	want[1] = s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+		Name: want[1].GetName(),
+	})
+
+	// Listing the tasks with show_deleted = true should include the soft
+	// deleted task.
+	got := s.client.ListAllTasksT(ctx, t, &pb.ListTasksRequest{
+		PageSize:    int32(len(want)),
+		ShowDeleted: true,
+	})
+	if diff := cmp.Diff(want, got, protocmp.Transform(), cmpopts.SortSlices(taskLessFunc)); diff != "" {
+		t.Errorf("unexpected result of ListTasks with show_deleted = true (-want +got)\n%s", diff)
+	}
+
+	// After the soft deleted task has expired it should no longer show up in
+	// ListTasks.
+	s.clock.Advance(want[1].GetExpiryTime().AsTime().Sub(s.clock.Now()))
+	s.clock.Advance(1 * time.Minute)
+	wantAfterExpiry := []*pb.Task{
+		want[0],
+		want[2],
+	}
+	got = s.client.ListAllTasksT(ctx, t, &pb.ListTasksRequest{
+		PageSize:    int32(len(want)),
+		ShowDeleted: true,
+	})
+	if diff := cmp.Diff(wantAfterExpiry, got, protocmp.Transform(), cmpopts.SortSlices(taskLessFunc)); diff != "" {
+		t.Errorf("after expiration: unexpected result of ListTasks with show_deleted = true (-want +got)\n%s", diff)
+	}
+}
+
 func (s *Suite) TestListTasks_WithAdditions() {
 	t := s.T()
 	ctx := context.Background()
@@ -483,6 +539,72 @@ func (s *Suite) TestListTasks_SamePageTokenTwice() {
 	_, err := s.client.ListTasks(ctx, req)
 	if got, want := status.Code(err), codes.InvalidArgument; got != want {
 		t.Errorf("second page again: return code = %v; want %v", got, want)
+	}
+}
+
+func (s *Suite) TestListTasks_ChangeRequestBetweenPages() {
+	t := s.T()
+	ctx := context.Background()
+
+	tasks := s.client.CreateTasksT(ctx, t, []*pb.Task{
+		{Title: "Buy milk"},
+		{Title: "Get swole"},
+	})
+
+	req := &pb.ListTasksRequest{
+		PageSize:    1,
+		ShowDeleted: false,
+	}
+
+	// Getting the first page should succeed without problems.
+	{
+		res := s.client.ListTasksT(ctx, t, req)
+		want := tasks[:1]
+		if diff := cmp.Diff(want, res.GetTasks(), protocmp.Transform(), cmpopts.SortSlices(taskLessFunc)); diff != "" {
+			t.Errorf("first page: unexpected results (-want +got)\n%s", diff)
+		}
+		req.PageToken = res.GetNextPageToken()
+	}
+
+	// Now we change the request parameters between pages, which should cause an error.
+	req.ShowDeleted = true
+	_, err := s.client.ListTasks(ctx, req)
+	if got, want := status.Code(err), codes.InvalidArgument; got != want {
+		t.Errorf("after changing request: ListTasks(%v) code = %v; want %v", req, got, want)
+		t.Logf("err = %v", err)
+	}
+}
+
+func (s *Suite) TestListTasks_Error() {
+	t := s.T()
+	ctx := context.Background()
+	for _, tt := range []struct {
+		name string
+		req  *pb.ListTasksRequest
+		want codes.Code
+	}{
+		{
+			name: "NegativePageSize",
+			req: &pb.ListTasksRequest{
+				PageSize: -10,
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "BogusPageToken",
+			req: &pb.ListTasksRequest{
+				PageToken: "this is some complete bonkers",
+			},
+			want: codes.InvalidArgument,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.client.ListTasks(ctx, tt.req)
+			if got, want := status.Code(err), tt.want; got != want {
+				t.Errorf("ListTasks(%v) code = %v; want %v", tt.req, got, want)
+				t.Logf("err = %v", err)
+			}
+		})
 	}
 }
 
@@ -909,9 +1031,18 @@ func (s *Suite) TestDeleteTask() {
 	// Once the task has been created it should be deleted.
 	{
 		req := &pb.DeleteTaskRequest{Name: task.GetName()}
-		_, err := s.client.DeleteTask(ctx, req)
+		deleted, err := s.client.DeleteTask(ctx, req)
 		if err != nil {
 			t.Fatalf("first deletion: DeleteTask(%v) err = %v; want nil", req, err)
+		}
+		if err := deleted.GetDeleteTime().CheckValid(); err != nil {
+			t.Errorf("first deletion: delete_time is invalid: %v", err)
+		}
+		if err := deleted.GetExpiryTime().CheckValid(); err != nil {
+			t.Errorf("first deletion: expiry_time is invalid: %v", err)
+		}
+		if delete, expiry := deleted.GetDeleteTime().AsTime(), deleted.GetExpiryTime().AsTime(); expiry.Before(delete) {
+			t.Errorf("first deletion: delete_time = %v; wanted before expiry_time = %v", delete, expiry)
 		}
 	}
 
@@ -953,6 +1084,82 @@ func (s *Suite) TestDeleteTask_Error() {
 			_, err := s.client.DeleteTask(ctx, tt.req)
 			if got := status.Code(err); got != tt.want {
 				t.Errorf("DeleteTask(%v) code = %v; want %v", tt.req, got, tt.want)
+				t.Logf("err = %v", err)
+			}
+		})
+	}
+}
+
+func (s *Suite) TestUndeleteTask() {
+	t := s.T()
+	ctx := context.Background()
+
+	// Create task, soft delete it, then undelete it. The result should be the
+	// same task as just after it was created.
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:       "This will be deleted",
+			Description: "And later undeleted, woohoo!",
+		},
+	})
+	s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+		Name: task.GetName(),
+	})
+	undeleted := s.client.UndeleteTaskT(ctx, t, &pb.UndeleteTaskRequest{
+		Name: task.GetName(),
+	})
+	if diff := cmp.Diff(task, undeleted, protocmp.Transform()); diff != "" {
+		t.Errorf("unexpected result after undeletion (-before +after)\n%s", diff)
+	}
+}
+
+func (s *Suite) TestUndeleteTask_Error() {
+	t := s.T()
+	ctx := context.Background()
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "Buy milk",
+		},
+	})
+
+	for _, tt := range []struct {
+		name string
+		req  *pb.UndeleteTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "EmptyName",
+			req: &pb.UndeleteTaskRequest{
+				Name: "",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "NotFound",
+			req: &pb.UndeleteTaskRequest{
+				Name: "tasks/notfound",
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "InvalidName",
+			req: &pb.UndeleteTaskRequest{
+				Name: "invalidlololol/1",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "NotDeleted",
+			req: &pb.UndeleteTaskRequest{
+				Name: task.GetName(),
+			},
+			want: codes.AlreadyExists,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.client.UndeleteTask(ctx, tt.req)
+			if got, want := status.Code(err), tt.want; got != want {
+				t.Errorf("UndeleteTask(%v) code = %v; want %v", tt.req, got, want)
 				t.Logf("err = %v", err)
 			}
 		})

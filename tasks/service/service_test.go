@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/suite"
 	"go.saser.se/postgres"
 	"go.saser.se/postgres/postgrestest"
@@ -15,7 +16,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-func setup(ctx context.Context, t *testing.T, pool *postgres.Pool) pb.TasksClient {
+func setup(ctx context.Context, t *testing.T, pool *postgres.Pool, clock clockwork.FakeClock) pb.TasksClient {
 	t.Helper()
 
 	const bufSize = 1024 * 1024
@@ -28,6 +29,7 @@ func setup(ctx context.Context, t *testing.T, pool *postgres.Pool) pb.TasksClien
 
 	srv := grpc.NewServer()
 	svc := New(pool)
+	svc.clock = clock
 	pb.RegisterTasksServer(srv, svc)
 	errc := make(chan error, 1)
 	go func() {
@@ -73,7 +75,8 @@ func (pt *poolTruncater) Truncate(ctx context.Context) error {
 func TestService(t *testing.T) {
 	ctx := context.Background()
 	pool := postgrestest.Open(ctx, t, "tasks/postgres/schema.sql")
-	client := setup(ctx, t, pool)
-	s := testsuite.New(client, &poolTruncater{pool: pool}, maxPageSize)
+	clock := clockwork.NewFakeClock()
+	client := setup(ctx, t, pool, clock)
+	s := testsuite.New(client, &poolTruncater{pool: pool}, clock, maxPageSize)
 	suite.Run(t, s)
 }

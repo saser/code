@@ -75,10 +75,20 @@ func (c *testClient) UpdateTaskT(ctx context.Context, tb testing.TB, req *pb.Upd
 	return task
 }
 
-func (c *testClient) DeleteTaskT(ctx context.Context, tb testing.TB, req *pb.DeleteTaskRequest) {
+func (c *testClient) DeleteTaskT(ctx context.Context, tb testing.TB, req *pb.DeleteTaskRequest) *pb.Task {
 	tb.Helper()
-	_, err := c.DeleteTask(ctx, req)
+	task, err := c.DeleteTask(ctx, req)
 	if err != nil {
 		tb.Fatalf("DeleteTask(%v) err = %v; want nil", req, err)
 	}
+	return task
+}
+
+func (c *testClient) UndeleteTaskT(ctx context.Context, tb testing.TB, req *pb.UndeleteTaskRequest) *pb.Task {
+	tb.Helper()
+	task, err := c.UndeleteTask(ctx, req)
+	if err != nil {
+		tb.Fatalf("UndeleteTask(%v) err = %v; want nil", req, err)
+	}
+	return task
 }

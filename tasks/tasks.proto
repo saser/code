@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package tasks;
 
-import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -21,8 +20,13 @@ service Tasks {
     // Update a single task.
     rpc UpdateTask(UpdateTaskRequest) returns (Task);
 
-    // Delete a task by name.
-    rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
+    // Soft delete a task by name. Soft deleted tasks are still available for
+    // some time but will eventually be permanently deleted.
+    rpc DeleteTask(DeleteTaskRequest) returns (Task);
+
+    // Undeletes a previously soft deleted task. Can only be done as long as the
+    // task has not been permanently deleted.
+    rpc UndeleteTask(UndeleteTaskRequest) returns (Task);
 }
 
 // A task is something that can be completed.
@@ -43,6 +47,12 @@ message Task {
 
     // When the task was created.
     google.protobuf.Timestamp create_time = 5;
+
+    // When the task was last soft deleted, if ever.
+    google.protobuf.Timestamp delete_time = 6;
+
+    // When the task will be permanently deleted after being soft deleted.
+    google.protobuf.Timestamp expiry_time = 7;
 }
 
 message GetTaskRequest {
@@ -59,6 +69,9 @@ message ListTasksRequest {
     // The standard page token. Optional. Get the values from responses to
     // ListTasks.
     string page_token = 2;
+
+    // Whether soft deleted resources should be included in the response.
+    bool show_deleted = 3;
 }
 
 message ListTasksResponse {
@@ -93,6 +106,12 @@ message UpdateTaskRequest {
 }
 
 message DeleteTaskRequest {
+    // The name.
+    // Format: tasks/{task}
+    string name = 1;
+}
+
+message UndeleteTaskRequest {
     // The name.
     // Format: tasks/{task}
     string name = 1;

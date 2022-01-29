@@ -984,6 +984,7 @@ def go_repositories():
         sum = "h1:DzdIHIjG1AxGwoEEqS+mGsURyjt4enSmqzACXvVzOT8=",
         version = "v1.10.1",
     )
+
     go_repository(
         name = "com_github_jackc_pgio",
         importpath = "github.com/jackc/pgio",
@@ -1047,8 +1048,8 @@ def go_repositories():
     go_repository(
         name = "com_github_jonboulle_clockwork",
         importpath = "github.com/jonboulle/clockwork",
-        sum = "h1:VKV+ZcuP6l3yW9doeqz6ziZGgcynBVQO+obU0+0hcPo=",
-        version = "v0.1.0",
+        sum = "h1:UOGuzwb1PwsrDAObMuhUnj0p5ULPj8V/xJ7Kx9qUBdQ=",
+        version = "v0.2.2",
     )
     go_repository(
         name = "com_github_json_iterator_go",

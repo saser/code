@@ -11,7 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -31,8 +30,12 @@ type TasksClient interface {
 	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*Task, error)
 	// Update a single task.
 	UpdateTask(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*Task, error)
-	// Delete a task by name.
-	DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Soft delete a task by name. Soft deleted tasks are still available for
+	// some time but will eventually be permanently deleted.
+	DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Undeletes a previously soft deleted task. Can only be done as long as the
+	// task has not been permanently deleted.
+	UndeleteTask(ctx context.Context, in *UndeleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
 }
 
 type tasksClient struct {
@@ -79,9 +82,18 @@ func (c *tasksClient) UpdateTask(ctx context.Context, in *UpdateTaskRequest, opt
 	return out, nil
 }
 
-func (c *tasksClient) DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *tasksClient) DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*Task, error) {
+	out := new(Task)
 	err := c.cc.Invoke(ctx, "/tasks.Tasks/DeleteTask", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) UndeleteTask(ctx context.Context, in *UndeleteTaskRequest, opts ...grpc.CallOption) (*Task, error) {
+	out := new(Task)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/UndeleteTask", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +112,12 @@ type TasksServer interface {
 	CreateTask(context.Context, *CreateTaskRequest) (*Task, error)
 	// Update a single task.
 	UpdateTask(context.Context, *UpdateTaskRequest) (*Task, error)
-	// Delete a task by name.
-	DeleteTask(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error)
+	// Soft delete a task by name. Soft deleted tasks are still available for
+	// some time but will eventually be permanently deleted.
+	DeleteTask(context.Context, *DeleteTaskRequest) (*Task, error)
+	// Undeletes a previously soft deleted task. Can only be done as long as the
+	// task has not been permanently deleted.
+	UndeleteTask(context.Context, *UndeleteTaskRequest) (*Task, error)
 	mustEmbedUnimplementedTasksServer()
 }
 
@@ -121,8 +137,11 @@ func (UnimplementedTasksServer) CreateTask(context.Context, *CreateTaskRequest) 
 func (UnimplementedTasksServer) UpdateTask(context.Context, *UpdateTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateTask not implemented")
 }
-func (UnimplementedTasksServer) DeleteTask(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error) {
+func (UnimplementedTasksServer) DeleteTask(context.Context, *DeleteTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteTask not implemented")
+}
+func (UnimplementedTasksServer) UndeleteTask(context.Context, *UndeleteTaskRequest) (*Task, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UndeleteTask not implemented")
 }
 func (UnimplementedTasksServer) mustEmbedUnimplementedTasksServer() {}
 
@@ -227,6 +246,24 @@ func _Tasks_DeleteTask_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Tasks_UndeleteTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UndeleteTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).UndeleteTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/UndeleteTask",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).UndeleteTask(ctx, req.(*UndeleteTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Tasks_ServiceDesc is the grpc.ServiceDesc for Tasks service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -253,6 +290,10 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteTask",
 			Handler:    _Tasks_DeleteTask_Handler,
+		},
+		{
+			MethodName: "UndeleteTask",
+			Handler:    _Tasks_UndeleteTask_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

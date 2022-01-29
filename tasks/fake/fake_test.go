@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/suite"
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"go.saser.se/tasks/testsuite"
@@ -82,7 +83,9 @@ func (t *truncater) Truncate(ctx context.Context) error {
 func TestService(t *testing.T) {
 	ctx := context.Background()
 	svc := New()
+	clock := clockwork.NewFakeClock()
+	svc.clock = clock
 	client := setup(ctx, t, svc)
-	s := testsuite.New(client, &truncater{s: svc}, maxPageSize)
+	s := testsuite.New(client, &truncater{s: svc}, clock, maxPageSize)
 	suite.Run(t, s)
 }
