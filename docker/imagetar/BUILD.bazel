@@ -8,15 +8,15 @@ container_image(
 )
 
 container_image(
-    name = "testimage_postgres",
-    base = "@postgres_image//image",
+    name = "testimage_hola_mundo",
+    base = "@hello_world_image//image",
 )
 
 container_bundle(
     name = "testbundle",
     images = {
         "bazel/docker/imagetar:testimage_hello_world": ":testimage_hello_world",
-        "bazel/docker/imagetar:testimage_postgres": ":testimage_postgres",
+        "bazel/docker/imagetar:testimage_hola_mundo": ":testimage_hola_mundo",
     },
 )
 

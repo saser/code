@@ -78,7 +78,7 @@ func TestRepositories(t *testing.T) {
 			want: map[string]map[string]string{
 				"bazel/docker/imagetar": {
 					"testimage_hello_world": "a5f34025714d147c8ad37b8e237b52af7b58a5f44be46a5e550f0873705d1f24",
-					"testimage_postgres":    "dbb3b0216e75b7d3bdaa1e956da967d6ded3809bd85f3887dbda8f6114868de0",
+					"testimage_hola_mundo":  "a5f34025714d147c8ad37b8e237b52af7b58a5f44be46a5e550f0873705d1f24",
 				},
 			},
 		},
@@ -139,7 +139,7 @@ func TestImages(t *testing.T) {
 			r:    bytes.NewReader(testbundle),
 			want: []string{
 				"bazel/docker/imagetar:testimage_hello_world",
-				"bazel/docker/imagetar:testimage_postgres",
+				"bazel/docker/imagetar:testimage_hola_mundo",
 			},
 		},
 	} {
@@ -148,7 +148,8 @@ func TestImages(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(tt.want, got); diff != "" {
+			lessFunc := func(s1, s2 string) bool { return s1 < s2 }
+			if diff := cmp.Diff(tt.want, got, cmpopts.SortSlices(lessFunc)); diff != "" {
 				t.Errorf("unexpected result from Images (-want +got)\n%s", diff)
 			}
 		})
