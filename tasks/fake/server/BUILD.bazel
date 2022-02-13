@@ -24,6 +24,6 @@ go_binary(
 
 go_image_with_ports(
     name = "server_image",
-    binary=":server",
+    binary = ":server",
     ports = ["8080/tcp"],
 )
