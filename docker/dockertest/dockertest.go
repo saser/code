@@ -6,9 +6,11 @@ package dockertest
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -148,20 +150,39 @@ func Run(ctx context.Context, tb testing.TB, opts RunOptions) string {
 func Address(ctx context.Context, tb testing.TB, id string, port string) string {
 	tb.Helper()
 	c := newClient(tb)
-	info, err := c.ContainerInspect(ctx, id)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	if info.NetworkSettings == nil {
+
+	// It seems that in testing this operation sometimes fails if it is executed
+	// too soon after the container has been created. Therefore, we execute the
+	// binding lookup with exponential backoff on errors, to increase its
+	// reliability. It should rarely matter in practice.
+
+	var bindings []nat.PortBinding
+	errLessThanOneBinding := errors.New("less than one binding")
+	op := backoff.Operation(func() error {
+		info, err := c.ContainerInspect(ctx, id)
+		if err != nil {
+			return err
+		}
+		if info.NetworkSettings == nil {
+			return errors.New("networksettings is nil")
+		}
+		var ok bool
+		bindings, ok = info.NetworkSettings.Ports[nat.Port(port)]
+		if !ok {
+			return errors.New("no port bindings at all")
+		}
+		if len(bindings) < 1 {
+			return &backoff.PermanentError{Err: errLessThanOneBinding}
+		}
+		return nil
+	})
+	if err := backoff.Retry(op, backoff.WithContext(backoff.NewExponentialBackOff(), ctx)); err != nil {
+		if errors.Is(err, errLessThanOneBinding) {
+			tb.Fatalf("container %v has less than one port binding for %q; got %v", id, port, bindings)
+		}
 		tb.Fatalf("port %q is not exposed by container %v", port, id)
 	}
-	bindings, ok := info.NetworkSettings.Ports[nat.Port(port)]
-	if !ok {
-		tb.Fatalf("port %q is not exposed by container %v", port, id)
-	}
-	if len(bindings) < 1 {
-		tb.Fatalf("container %v has less than one port binding for %q; got %v", id, port, bindings)
-	}
+
 	b := bindings[0]
 	return net.JoinHostPort(b.HostIP, b.HostPort)
 }
