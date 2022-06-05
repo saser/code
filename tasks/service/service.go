@@ -11,6 +11,8 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/golang/glog"
 	"github.com/google/uuid"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jonboulle/clockwork"
@@ -71,7 +73,11 @@ func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task
 	if !strings.HasPrefix(name, "tasks/") {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
-	id, err := strconv.ParseInt(strings.TrimPrefix(name, "tasks/"), 10, 64)
+	resourceID := strings.TrimPrefix(name, "tasks/")
+	if resourceID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task does not contain a resource ID after "tasks/".`)
+	}
+	id, err := strconv.ParseInt(resourceID, 10, 64)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
@@ -85,7 +91,7 @@ func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task
 		if err != nil {
 			return err
 		}
-		t, err := taskByID(ctx, tx, id, true /*showDeleted*/)
+		t, err := queryTaskByID(ctx, tx, id, true /*showDeleted*/)
 		if err != nil {
 			return err
 		}
@@ -95,6 +101,7 @@ func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 		}
+		glog.Error(err)
 		return nil, internalError
 	}
 	if expiry := task.GetExpiryTime(); expiry.IsValid() && now.After(expiry.AsTime()) {
@@ -293,15 +300,36 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 	if task.GetCompleted() {
 		return nil, status.Error(codes.InvalidArgument, "The task must not already be completed.")
 	}
+	parent := task.GetParent()
+	parentID := int64(-1)
+	if parent != "" {
+		if !strings.HasPrefix(parent, "tasks/") {
+			return nil, status.Errorf(codes.InvalidArgument, `The parent field must have the format "tasks/{task}": %q`, parent)
+		}
+		id, err := strconv.ParseInt(strings.TrimPrefix(parent, "tasks/"), 10, 64)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
+		}
+		parentID = id
+	}
+	errParentNotFound := errors.New("parent not found")
+	// This constraint name should be taken from the schema file.
+	const parentReferencesID = "parent_references_id"
 	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		now, err := s.now(ctx, tx)
 		if err != nil {
 			return err
 		}
+		columns := []string{"title", "description", "completed", "create_time"}
+		values := []interface{}{task.GetTitle(), task.GetDescription(), task.GetCompleted(), now}
+		if parentID != -1 {
+			columns = append(columns, "parent")
+			values = append(values, parentID)
+		}
 		sql, args, err := postgres.StatementBuilder.
 			Insert("tasks").
-			Columns("title", "description", "completed", "create_time").
-			Values(task.GetTitle(), task.GetDescription(), task.GetCompleted(), now).
+			Columns(columns...).
+			Values(values...).
 			Suffix("RETURNING id, create_time").
 			ToSql()
 		if err != nil {
@@ -315,12 +343,25 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 			&id,
 			&createTime,
 		); err != nil {
+			if e := (*pgconn.PgError)(nil); errors.As(err, &e) {
+				if e.Code != pgerrcode.ForeignKeyViolation {
+					return err
+				}
+				if e.ConstraintName != parentReferencesID {
+					return err
+				}
+				return errParentNotFound
+			}
 			return err
 		}
 		task.Name = "tasks/" + fmt.Sprint(id)
 		task.CreateTime = timestamppb.New(createTime)
 		return nil
 	}); err != nil {
+		if errors.Is(err, errParentNotFound) {
+			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
+		}
+		glog.Error(err)
 		return nil, internalError
 	}
 	return task, nil
@@ -365,7 +406,7 @@ func (s *Service) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*p
 	}
 	for _, path := range updateMask.GetPaths() {
 		switch path {
-		case "completed", "create_time", "name":
+		case "parent", "completed", "create_time", "name":
 			return nil, status.Errorf(codes.InvalidArgument, "The field %q cannot be updated with UpdateTask.")
 		case "*":
 			// We handled the only valid case of giving a wildcard path above,
@@ -388,7 +429,7 @@ func (s *Service) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*p
 		// version of the task.
 		if proto.Equal(patch, &pb.Task{Name: name} /* empty patch except for the name */) {
 			var err error
-			updatedTask, err = taskByID(ctx, tx, id, false /*showDeleted*/)
+			updatedTask, err = queryTaskByID(ctx, tx, id, false /*showDeleted*/)
 			return err
 		}
 		// Update only the columns corresponding to the fields in the patch.
@@ -446,66 +487,83 @@ func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*p
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
-	deleted := &pb.Task{
-		Name: name,
-	}
-	var createTime, deleteTime, expiryTime time.Time
+	// deleted will eventually be returned as the updated version of the task.
+	var deleted *pb.Task
 
+	errForceRequired := errors.New("force: true is required")
 	txFunc := func(tx pgx.Tx) error {
-		// I opted out of using the statement builder here because I couldn't
-		// get "NOW() + interval '30 days'" to work with it (it tries to parse
-		// the string "NOW() + interval '30 days'" as a TIMESTAMP WITH TIME
-		// ZONE).
-		sqlTmpl := strings.TrimSpace(`
-UPDATE
-    tasks
-SET
-    delete_time = %s, -- deleteTimeParameter
-    expiry_time = %s  -- expiryTimeParameter
-WHERE
-    id = $1
-    AND delete_time IS NULL
-RETURNING
-    title,
-    description,
-    completed,
-    create_time,
-    delete_time,
-    expiry_time
-`)
-		args := []interface{}{
-			id, // $1
+		var err error
+
+		// We must do two things:
+		//     1. Ensure that the task being deleted exists.
+		//     2. Return the new version of the task when it has been deleted.
+		// To kill both these birds with one stone, we get the task from the
+		// database here. If it doesn't exist, we will get an error. If it does
+		// exist, we will get all the details and don't need to query for them
+		// later.
+		deleted, err = queryTaskByID(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
 		}
-		var deleteTimeParameter, expiryTimeParameter string
-		if s.clock != nil {
-			now := s.clock.Now()
-			args = append(args, now) // $2
-			deleteTimeParameter = "$2"
-			args = append(args, now.AddDate(0 /*years*/, 0 /*months*/, 30 /*days*/)) // $3
-			expiryTimeParameter = "$3"
-		} else {
-			deleteTimeParameter = "NOW()"
-			expiryTimeParameter = "NOW() + interval '30 days'"
+
+		// We also need to find out if there are any descendant tasks, and
+		// return an error if there are such tasks and the request doesn't
+		// contain `force: true`.
+		descIDs, err := queryDescendantIDs(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
 		}
-		sql := fmt.Sprintf(sqlTmpl, deleteTimeParameter, expiryTimeParameter)
-		return tx.QueryRow(ctx, sql, args...).Scan(
-			&deleted.Title,
-			&deleted.Description,
-			&deleted.Completed,
-			&createTime,
-			&deleteTime,
-			&expiryTime,
-		)
+		if len(descIDs) > 0 && !req.GetForce() {
+			return errForceRequired
+		}
+		// As descIDs doesn't include the ID of the task being deleted, we add
+		// it here.
+		descIDs = append(descIDs, id)
+		// Now we are ready to make updates.
+
+		// We "delete" tasks by setting their `delete_time` and `expiry_time`
+		// fields. `delete_time` should be set to the current time, and
+		// `expiry_time` is arbitrarily chosen to be some point in the future.
+		deleteTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		expiryTime := deleteTime.AddDate(0 /* years */, 0 /* months */, 30 /* days */)
+
+		// These new timestamps should be reflected in the returned version of
+		// the task.
+		deleted.DeleteTime = timestamppb.New(deleteTime)
+		deleted.ExpiryTime = timestamppb.New(expiryTime)
+
+		// Below is the actual update in the database. We only update and don't
+		// return anything back, because we have already fetched everything
+		// using taskByID above.
+		sql, args, err := postgres.StatementBuilder.
+			Update("tasks").
+			SetMap(map[string]interface{}{
+				"delete_time": deleteTime,
+				"expiry_time": expiryTime,
+			}).
+			Where(squirrel.Eq{
+				"id": descIDs,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
 	}
 	if err := s.pool.BeginFunc(ctx, txFunc); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 		}
+		if errors.Is(err, errForceRequired) {
+			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has children; not deleting without `force: true`.", name)
+		}
+		glog.Error(err)
 		return nil, internalError
 	}
-	deleted.CreateTime = timestamppb.New(createTime)
-	deleted.DeleteTime = timestamppb.New(deleteTime)
-	deleted.ExpiryTime = timestamppb.New(expiryTime)
 	return deleted, nil
 }
 
@@ -525,12 +583,13 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 	errNotFound := errors.New("task does not exist")
 	errNotDeleted := errors.New("task has not been deleted")
 	errExpired := errors.New("task has expired")
+	errUndeleteAncestorsRequired := errors.New("`undelete_ancestors: true` is required")
 	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
 		now, err := s.now(ctx, tx)
 		if err != nil {
 			return err
 		}
-		task, err = taskByID(ctx, tx, id, true /*showDeleted*/)
+		task, err = queryTaskByID(ctx, tx, id, true /*showDeleted*/)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return errNotFound
@@ -543,6 +602,42 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 		if now.After(task.GetExpiryTime().AsTime()) {
 			return errExpired
 		}
+
+		// We know the task itself is valid for undeletion. Now we want to
+		// validate whether the `undelete_ancestor` argument is correct in the
+		// request. We do that by fetching all ancestors -- deleted or not --
+		// and then collecting the ones that are deleted. If there are at least
+		// one and `undelete_ancestors` isn't set to true, we return an error to
+		// the user.
+		var toUndeleteIDs []int64
+		ancestorIDs, err := queryAncestorIDs(ctx, tx, id, true /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		for _, ancestorID := range ancestorIDs {
+			ancestor, err := queryTaskByID(ctx, tx, ancestorID, true /* showDeleted */)
+			if err != nil {
+				return err
+			}
+			if ancestor.GetDeleteTime().IsValid() {
+				toUndeleteIDs = append(toUndeleteIDs, ancestorID)
+			}
+		}
+		if len(toUndeleteIDs) > 0 && !req.GetUndeleteAncestors() {
+			return errUndeleteAncestorsRequired
+		}
+		// Now, if we should also undelete any descendants, we find their IDs
+		// here.
+		if req.GetUndeleteDescendants() {
+			descIDs, err := queryDescendantIDs(ctx, tx, id, true /* showDeleted */)
+			if err != nil {
+				return err
+			}
+			toUndeleteIDs = append(toUndeleteIDs, descIDs...)
+		}
+		// Finally, we add the ID of the task itself to the list of IDs that
+		// should be undeleted.
+		toUndeleteIDs = append(toUndeleteIDs, id)
 		sql, args, err := postgres.StatementBuilder.
 			Update("tasks").
 			SetMap(map[string]interface{}{
@@ -550,7 +645,7 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 				"expiry_time": nil,
 			}).
 			Where(squirrel.Eq{
-				"id": id,
+				"id": toUndeleteIDs,
 			}).
 			ToSql()
 		if err != nil {
@@ -565,6 +660,9 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 		if errors.Is(err, errNotDeleted) {
 			return nil, status.Errorf(codes.AlreadyExists, "A task with name %q already exists.", name)
 		}
+		if errors.Is(err, errUndeleteAncestorsRequired) {
+			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has deleted ancestors but `undelete_ancestors` was not set to `true`.", name)
+		}
 		glog.Error(err)
 		return nil, internalError
 	}
@@ -573,11 +671,79 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 	return task, nil
 }
 
-// taskByID the database within the given transaction for the task with the
+// queryDescendantIDs returns the IDs of all tasks descending, directly or
+// transitively, from rootID. Note that rootID is itself not included in the
+// resulting slice. If showDeleted is true, IDs from deleted descendant tasks
+// are also included.
+func queryDescendantIDs(ctx context.Context, tx pgx.Tx, rootID int64, showDeleted bool) ([]int64, error) {
+	view := "existing_tasks_descendants"
+	if showDeleted {
+		view = "tasks_descendants"
+	}
+	sql, args, err := postgres.StatementBuilder.
+		Select("descendant").
+		From(view).
+		Where(squirrel.Eq{
+			"task": rootID,
+		}).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	// SQL setup is done. Now we can run the query. We scan each row's result
+	// into id, and then collect everything into ids.
+	var (
+		id  int64
+		ids []int64
+	)
+	scans := []interface{}{&id}
+	if _, err := tx.QueryFunc(ctx, sql, args, scans, func(_ pgx.QueryFuncRow) error {
+		ids = append(ids, id)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+func queryAncestorIDs(ctx context.Context, tx pgx.Tx, leafID int64, showDeleted bool) ([]int64, error) {
+	view := "existing_tasks_ancestors"
+	if showDeleted {
+		view = "tasks_ancestors"
+	}
+	sql, args, err := postgres.StatementBuilder.
+		Select("ancestor").
+		From(view).
+		Where(squirrel.Eq{
+			"task": leafID,
+		}).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	// SQL setup is done. Now we can run the query. We scan each row's result
+	// into id, and then collect everything into ids.
+	var (
+		id  int64
+		ids []int64
+	)
+	scans := []interface{}{&id}
+	if _, err := tx.QueryFunc(ctx, sql, args, scans, func(_ pgx.QueryFuncRow) error {
+		ids = append(ids, id)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+// queryTaskByID the database within the given transaction for the task with the
 // given ID. Any errors from database driver is returned. For example, if no
 // task is found by the given ID, pgx.ErrNoRows is returned, and callers should
 // check for it using errors.Is.
-func taskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (*pb.Task, error) {
+func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (*pb.Task, error) {
 	task := &pb.Task{
 		Name: "tasks/" + fmt.Sprint(id),
 	}
@@ -591,16 +757,17 @@ func taskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (*pb.T
 			"create_time",
 			"delete_time",
 			"expiry_time",
-		).
-		From("tasks").
+		)
+
+	from := "existing_tasks"
+	if showDeleted {
+		from = "tasks"
+	}
+	st = st.
+		From(from).
 		Where(squirrel.Eq{
 			"id": id,
 		})
-	if !showDeleted {
-		st = st.Where(squirrel.Eq{
-			"delete_time": nil,
-		})
-	}
 	sql, args, err := st.ToSql()
 	if err != nil {
 		return nil, err
@@ -630,6 +797,8 @@ func (s *Service) now(ctx context.Context, tx pgx.Tx) (time.Time, error) {
 		return s.clock.Now(), nil
 	}
 	var now time.Time
-	err := tx.QueryRow(ctx, "SELECT NOW()").Scan(&now)
-	return now, err
+	if err := tx.QueryRow(ctx, "SELECT NOW()").Scan(&now); err != nil {
+		return time.Time{}, err
+	}
+	return now, nil
 }

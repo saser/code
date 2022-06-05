@@ -160,6 +160,13 @@ func (s *Suite) TestGetTask_Error() {
 			want: codes.InvalidArgument,
 		},
 		{
+			name: "InvalidName_NoResourceID",
+			req: &pb.GetTaskRequest{
+				Name: "tasks/",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
 			name: "NotFound",
 			req:  &pb.GetTaskRequest{Name: "tasks/999"},
 			want: codes.NotFound,
@@ -634,6 +641,36 @@ func (s *Suite) TestCreateTask() {
 	}
 }
 
+func (s *Suite) TestCreateTask_WithParent() {
+	t := s.T()
+	ctx := context.Background()
+
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{Title: "Parent task"},
+	})
+
+	child := &pb.Task{
+		Title:  "Child task",
+		Parent: parent.GetName(),
+	}
+	req := &pb.CreateTaskRequest{
+		Task: child,
+	}
+	got, err := s.client.CreateTask(ctx, req)
+	if err != nil {
+		t.Fatalf("CreateTask(%v) err = %v; want nil", req, err)
+	}
+	if err := got.GetCreateTime().CheckValid(); err != nil {
+		t.Errorf("got.GetCreateTime() is invalid: %v", err)
+	}
+	if got, want := got.GetCreateTime().AsTime().IsZero(), false; got != want {
+		t.Errorf("got.GetCreateTime().AsTime().IsZero() = %v; want %v", got, want)
+	}
+	if diff := cmp.Diff(child, got, protocmp.Transform(), protocmp.IgnoreFields(child, "name", "create_time")); diff != "" {
+		t.Errorf("CreateTask(%v): unexpected result (-want +got)\n%s", req, diff)
+	}
+}
+
 func (s *Suite) TestCreateTask_Error() {
 	t := s.T()
 	ctx := context.Background()
@@ -661,6 +698,36 @@ func (s *Suite) TestCreateTask_Error() {
 				},
 			},
 			want: codes.InvalidArgument,
+		},
+		{
+			name: "InvalidParent",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:  "Invalid parent",
+					Parent: "foobar/123",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "NotFoundParent_TextResourceID",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:  "Parent doesn't exist",
+					Parent: "tasks/notfound",
+				},
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "NotFoundParent_NumericalResourceID",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:  "Parent doesn't exist",
+					Parent: "tasks/999",
+				},
+			},
+			want: codes.NotFound,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -882,6 +949,11 @@ func (s *Suite) TestUpdateTask_Error() {
 			Description: "That also has a description",
 		},
 	})
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "Potential parent",
+		},
+	})
 
 	for _, tt := range []struct {
 		name string
@@ -975,6 +1047,19 @@ func (s *Suite) TestUpdateTask_Error() {
 			},
 			want: codes.InvalidArgument,
 		},
+		{
+			name: "UpdateParent",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name:   task.GetName(),
+					Parent: parent.GetName(),
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"parent"},
+				},
+			},
+			want: codes.InvalidArgument,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := s.client.UpdateTask(ctx, tt.req)
@@ -1056,6 +1141,132 @@ func (s *Suite) TestDeleteTask() {
 	}
 }
 
+func (s *Suite) TestDeleteTask_WithChildren() {
+	t := s.T()
+	ctx := context.Background()
+
+	// Set up a tasks hierarchy looking like this:
+	//     r
+	//    / \
+	//   a   b
+	//  / \
+	// c1 c2
+	r := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "r",
+		},
+	})
+	a := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "a",
+			Parent: r.GetName(),
+		},
+	})
+	b := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "b",
+			Parent: r.GetName(),
+		},
+	})
+	c1 := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "c1",
+			Parent: a.GetName(),
+		},
+	})
+	c2 := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "c2",
+			Parent: a.GetName(),
+		},
+	})
+
+	// At this point
+	// * we should _not_ be able to delete r or a without force = true, and
+	// * we _should_ be able to delete b, c1, and c2 without force = true.
+	// We test this by trying to do the disallowed deletes first, asserting that
+	// they indeed fail, then doing the allowed deletes, asserting that they
+	// succeed.
+	for _, task := range []*pb.Task{r, a} {
+		req := &pb.DeleteTaskRequest{
+			Name:  task.GetName(),
+			Force: false,
+		}
+		_, err := s.client.DeleteTask(ctx, req)
+		if got, want := status.Code(err), codes.FailedPrecondition; got != want {
+			t.Errorf("delete without force: DeleteTask(%v) err = %v, code = %v; want nil, code = %v", req, err, got, want)
+		}
+	}
+	for _, task := range []*pb.Task{b, c1, c2} {
+		req := &pb.DeleteTaskRequest{
+			Name:  task.GetName(),
+			Force: false,
+		}
+		// We don't assert anything about the actual result of the deletion,
+		// other than it should succeed.
+		if _, err := s.client.DeleteTask(ctx, req); err != nil {
+			t.Errorf("delete without force: DeleteTask(%v) err = %v; want nil", req, err)
+		}
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	// At this point the tree looks like this with deleted tasks in brackets:
+	//
+	//        r
+	//      /   \
+	//     a    [b]
+	//   /   \
+	// [c1] [c2]
+	//
+	// We restore b and c1, and then delete r with force = true at a later
+	// point. This should leave all tasks deleted, but c2 will have an earlier
+	// deletion time than the other tasks.
+	for _, task := range []*pb.Task{b, c1} {
+		s.client.UndeleteTaskT(ctx, t, &pb.UndeleteTaskRequest{Name: task.GetName()})
+	}
+	s.clock.Advance(15 * time.Minute)
+	req := &pb.DeleteTaskRequest{
+		Name:  r.GetName(),
+		Force: true,
+	}
+	if _, err := s.client.DeleteTask(ctx, req); err != nil {
+		t.Fatalf("delete with force: DeleteTask(%v) err = %v; want nil", req, err)
+	}
+	r = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: r.GetName()})
+	a = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: a.GetName()})
+	b = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: b.GetName()})
+	c1 = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: c1.GetName()})
+	c2 = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: c2.GetName()})
+	// Now all tasks should have a delete_time. We create a mapping from
+	// delete_time to task, and assert that r == a == b == c1 != c2.
+	gotDeleteTimes := make(map[time.Time][]*pb.Task)
+	for _, task := range []*pb.Task{r, a, b, c1, c2} {
+		dt := task.GetDeleteTime().AsTime()
+		gotDeleteTimes[dt] = append(gotDeleteTimes[dt], task)
+	}
+	wantDeleteTimes := map[time.Time][]*pb.Task{
+		r.GetDeleteTime().AsTime():  {r, a, b, c1},
+		c2.GetDeleteTime().AsTime(): {c2},
+	}
+	if diff := cmp.Diff(
+		wantDeleteTimes, gotDeleteTimes,
+		protocmp.Transform(), cmpopts.SortSlices(taskLessFunc),
+	); diff != "" {
+		t.Errorf("Unexpected delete times after cascading delete (-want +got)\n%s", diff)
+	}
+	// Also assert the time ordering here -- all tasks should have a later
+	// delete_time than c2.
+	for _, task := range []*pb.Task{r, a, b, c1} {
+		taskTime := task.GetDeleteTime().AsTime()
+		c2Time := c2.GetDeleteTime().AsTime()
+		if !taskTime.After(c2Time) {
+			t.Errorf("%q delete_time = %v; want after %v", task.GetName(), taskTime, c2Time)
+		}
+	}
+}
+
 func (s *Suite) TestDeleteTask_Error() {
 	t := s.T()
 	ctx := context.Background()
@@ -1110,6 +1321,241 @@ func (s *Suite) TestUndeleteTask() {
 	})
 	if diff := cmp.Diff(task, undeleted, protocmp.Transform()); diff != "" {
 		t.Errorf("unexpected result after undeletion (-before +after)\n%s", diff)
+	}
+}
+
+func (s *Suite) TestUndeleteTask_WithFamily() {
+	t := s.T()
+	ctx := context.Background()
+
+	// Create root hierarchy that looks like
+	//     root -> middle -> leaf
+	// where "->" means "parent of".
+	root := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "root",
+		},
+	})
+	middle := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Parent: root.GetName(),
+			Title:  "middle",
+		},
+	})
+	leaf := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Parent: middle.GetName(),
+			Title:  "leaf",
+		},
+	})
+
+	// Each test case will start out with
+	//     [root] -> [middle] -> [leaf]
+	// where "[x]" means "task x is soft deleted".
+	for _, tt := range []struct {
+		name string
+		req  *pb.UndeleteTaskRequest
+		want map[string]bool // name -> whether it is left deleted
+	}{
+		{
+			name: "Middle_UndeleteAncestors",
+			req: &pb.UndeleteTaskRequest{
+				Name:                middle.GetName(),
+				UndeleteAncestors:   true,
+				UndeleteDescendants: false,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   true,
+			},
+		},
+		{
+			name: "Middle_UndeleteAncestors_UndeleteDescendants",
+			req: &pb.UndeleteTaskRequest{
+				Name:                middle.GetName(),
+				UndeleteAncestors:   true,
+				UndeleteDescendants: true,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   false,
+			},
+		},
+		{
+			name: "Root_UndeleteAncestors",
+			req: &pb.UndeleteTaskRequest{
+				Name:                root.GetName(),
+				UndeleteAncestors:   true,
+				UndeleteDescendants: false,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): true,
+				leaf.GetName():   true,
+			},
+		},
+		{
+			name: "Root_UndeleteAncestors_UndeleteDescendants",
+			req: &pb.UndeleteTaskRequest{
+				Name:                root.GetName(),
+				UndeleteAncestors:   true,
+				UndeleteDescendants: true,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   false,
+			},
+		},
+		{
+			name: "Root_UndeleteDescendants",
+			req: &pb.UndeleteTaskRequest{
+				Name:                root.GetName(),
+				UndeleteAncestors:   false,
+				UndeleteDescendants: true,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   false,
+			},
+		},
+		{
+			name: "Leaf_UndeleteAncestors",
+			req: &pb.UndeleteTaskRequest{
+				Name:                leaf.GetName(),
+				UndeleteAncestors:   true,
+				UndeleteDescendants: false,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   false,
+			},
+		},
+		{
+			name: "Leaf_UndeleteAncestors_UndeleteDescendants",
+			req: &pb.UndeleteTaskRequest{
+				Name:                leaf.GetName(),
+				UndeleteAncestors:   true,
+				UndeleteDescendants: true,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   false,
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make sure we start out with all tasks deleted.
+			s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+				Name:  root.GetName(),
+				Force: true,
+			})
+
+			_, err := s.client.UndeleteTask(ctx, tt.req)
+			if err != nil {
+				t.Fatalf("UndeleteTask(%v) err = %v; want nil", tt.req, err)
+			}
+			got := make(map[string]bool)
+			for _, task := range []string{
+				root.GetName(),
+				middle.GetName(),
+				leaf.GetName(),
+			} {
+				got[task] = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: task}).GetDeleteTime().IsValid()
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Fatalf("Unexpected result of undeleting (-want +got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func (s *Suite) TestUndeleteTask_WithFamily_Error() {
+	t := s.T()
+	ctx := context.Background()
+
+	// Create root hierarchy that looks like
+	//     root -> middle -> leaf
+	// where "->" means "parent of".
+	root := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "root",
+		},
+	})
+	middle := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Parent: root.GetName(),
+			Title:  "middle",
+		},
+	})
+	leaf := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Parent: middle.GetName(),
+			Title:  "leaf",
+		},
+	})
+
+	// Now, delete all tasks so that we end up with
+	//     [root] -> [middle] -> [leaf]
+	// where "[x]" means "task x is soft deleted".
+	s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+		Name:  root.GetName(),
+		Force: true,
+	})
+
+	for _, tt := range []struct {
+		name string
+		req  *pb.UndeleteTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "Leaf_NoUndeleteAncestors",
+			req: &pb.UndeleteTaskRequest{
+				Name:                leaf.GetName(),
+				UndeleteAncestors:   false,
+				UndeleteDescendants: false,
+			},
+			want: codes.FailedPrecondition,
+		},
+		{
+			name: "Middle_NoUndeleteAncestors",
+			req: &pb.UndeleteTaskRequest{
+				Name:                middle.GetName(),
+				UndeleteAncestors:   false,
+				UndeleteDescendants: false,
+			},
+			want: codes.FailedPrecondition,
+		},
+		{
+			name: "Leaf_NoUndeleteAncestors_UndeleteDescendants",
+			req: &pb.UndeleteTaskRequest{
+				Name:                leaf.GetName(),
+				UndeleteAncestors:   false,
+				UndeleteDescendants: true,
+			},
+			want: codes.FailedPrecondition,
+		},
+		{
+			name: "Middle_NoUndeleteAncestors_UndeleteDescendants",
+			req: &pb.UndeleteTaskRequest{
+				Name:                middle.GetName(),
+				UndeleteAncestors:   false,
+				UndeleteDescendants: true,
+			},
+			want: codes.FailedPrecondition,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.client.UndeleteTask(ctx, tt.req)
+			if got, want := status.Code(err), tt.want; got != want {
+				t.Errorf("UndeleteTask(%v) err = %v; got code = %v; want %v", tt.req, err, got, want)
+			}
+		})
 	}
 }
 

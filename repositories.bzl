@@ -984,6 +984,12 @@ def go_repositories():
         sum = "h1:DzdIHIjG1AxGwoEEqS+mGsURyjt4enSmqzACXvVzOT8=",
         version = "v1.10.1",
     )
+    go_repository(
+        name = "com_github_jackc_pgerrcode",
+        importpath = "github.com/jackc/pgerrcode",
+        sum = "h1:s+4MhCQ6YrzisK6hFJUX53drDT4UsSW3DEhKn0ifuHw=",
+        version = "v0.0.0-20220416144525-469b46aa5efa",
+    )
 
     go_repository(
         name = "com_github_jackc_pgio",

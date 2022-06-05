@@ -35,24 +35,29 @@ message Task {
     // Format: tasks/{task}
     string name = 1;
 
+    // The task under which this task is ordered. Optional. Used to build up a
+    // hierarchy of tasks.
+    // Format: tasks/{task}
+    string parent = 2;
+
     // The title of the task. Must be a short string.
-    string title = 2;
+    string title = 3;
 
     // The description of the task. Can be a long string. Not all tasks have
     // descriptions.
-    string description = 3;
+    string description = 4;
 
     // Whether the task has been completed.
-    bool completed = 4;
+    bool completed = 5;
 
     // When the task was created.
-    google.protobuf.Timestamp create_time = 5;
+    google.protobuf.Timestamp create_time = 6;
 
     // When the task was last soft deleted, if ever.
-    google.protobuf.Timestamp delete_time = 6;
+    google.protobuf.Timestamp delete_time = 7;
 
     // When the task will be permanently deleted after being soft deleted.
-    google.protobuf.Timestamp expiry_time = 7;
+    google.protobuf.Timestamp expiry_time = 8;
 }
 
 message GetTaskRequest {
@@ -109,10 +114,29 @@ message DeleteTaskRequest {
     // The name.
     // Format: tasks/{task}
     string name = 1;
+
+    // Whether to force a cascading delete. If the named task has any child
+    // tasks, and `force` is omitted or set to false, the deletion will fail. If
+    // `force` is set to true, the named task will be deleted along with all
+    // child tasks in a recursive fashion.
+    bool force = 2;
 }
 
 message UndeleteTaskRequest {
     // The name.
     // Format: tasks/{task}
     string name = 1;
+
+    // Whether to force a cascading undelete of ancestors. If the named task has
+    // at least one deleted ancestor, and `undelete_ancestors` is omitted or set
+    // to false, the undeletion will fail. If `undelete_ancestors` is set to
+    // true, the named task will be undeleted along with all deleted ancestors,
+    // direct or transitive.
+    bool undelete_ancestors = 2;
+
+    // Whether to also undelete any deleted descendant (direct or transitive)
+    // tasks of the named task. Unlike `undelete_ancestors`, it is valid to omit
+    // `undelete_descendants` or set it to false even if the named task has
+    // deleted descendants.
+    bool undelete_descendants = 3;
 }

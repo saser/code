@@ -76,6 +76,9 @@ func (t *truncater) Truncate(ctx context.Context) error {
 	for k := range t.s.pageTokens {
 		delete(t.s.pageTokens, k)
 	}
+	for k := range t.s.taskIndices {
+		delete(t.s.taskIndices, k)
+	}
 	t.s.nextID = 1
 	return nil
 }

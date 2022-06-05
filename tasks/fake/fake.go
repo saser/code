@@ -6,7 +6,6 @@ package fake
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,18 +47,19 @@ func init() {
 }
 
 type pageToken struct {
-	MinimumID   int
-	ShowDeleted bool
+	MinimumIndex int
+	ShowDeleted  bool
 }
 
 // Fake implements the Tasks service using only in-memory data structures.
 type Fake struct {
 	pb.UnimplementedTasksServer
 
-	mu         sync.Mutex
-	nextID     int
-	tasks      []*pb.Task
-	pageTokens map[string]pageToken // token (UUID) -> minimum ID and whether to show deleted
+	mu          sync.Mutex
+	nextID      int
+	tasks       []*pb.Task
+	taskIndices map[string]int       // task name -> index in `tasks`
+	pageTokens  map[string]pageToken // token (UUID) -> minimum ID and whether to show deleted
 
 	// Only used in testing. Nil otherwise.
 	clock clockwork.FakeClock
@@ -68,10 +68,71 @@ type Fake struct {
 // New creates a new Fake ready to use.
 func New() *Fake {
 	return &Fake{
-		nextID:     1,
-		tasks:      nil,
-		pageTokens: make(map[string]pageToken),
+		nextID:      1,
+		tasks:       nil,
+		taskIndices: make(map[string]int),
+		pageTokens:  make(map[string]pageToken),
 	}
+}
+
+// validateName returns an error if name isn't a valid task name.
+func validateName(name string) error {
+	const prefix = "tasks/"
+	if !strings.HasPrefix(name, prefix) {
+		return &invalidNameError{
+			Name:   name,
+			Reason: fmt.Sprintf("name doesn't have prefix %q", prefix),
+		}
+	}
+	if id := strings.TrimPrefix(name, prefix); id == "" {
+		return &invalidNameError{
+			Name:   name,
+			Reason: fmt.Sprintf("name doesn't have a resource ID after %q", prefix),
+		}
+	}
+	return nil
+}
+
+// childIndices returns indices into f.tasks for all tasks that are direct
+// children to the task named parent. Note that this does not include parent
+// itself, nor any transitive children.
+func (f *Fake) childIndices(parent string) []int {
+	var indices []int
+	for i, task := range f.tasks {
+		if task.GetParent() == parent {
+			indices = append(indices, i)
+		}
+	}
+	return indices
+}
+
+// descendantIndices returns indices into f.tasks for all tasks that are either
+// direct or transitive descendants of the task named parent. Note that this
+// does not include parent itself.
+func (f *Fake) descendantIndices(parent string) []int {
+	indices := f.childIndices(parent)
+	for _, i := range indices {
+		indices = append(indices, f.childIndices(f.tasks[i].GetName())...)
+	}
+	return indices
+}
+
+// ancestorIndices returns indices into f.tasks for all tasks that are either a
+// direct or transitive ancestors of the task named child. Note that this does
+// not include child itself.
+func (f *Fake) ancestorIndices(child string) []int {
+	var indices []int
+	current := child
+	for current != "" {
+		parent := f.tasks[f.taskIndices[current]].GetParent()
+		if parent != "" {
+			indices = append(indices, f.taskIndices[parent])
+			current = parent
+		} else {
+			break
+		}
+	}
+	return indices
 }
 
 func (f *Fake) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task, error) {
@@ -79,21 +140,18 @@ func (f *Fake) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task, e
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if !strings.HasPrefix(name, "tasks/") {
+	if err := validateName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
-	}
-	id, err := strconv.Atoi(strings.TrimPrefix(name, "tasks/"))
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if id >= f.nextID {
+	idx, ok := f.taskIndices[name]
+	if !ok {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
-	task := f.tasks[id-1]
+	task := f.tasks[idx]
 	if expiry := task.GetExpiryTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
@@ -112,7 +170,7 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	minID := 1
+	minIndex := 0
 	if token := req.GetPageToken(); token != "" {
 		pt, ok := f.pageTokens[token]
 		if !ok {
@@ -121,14 +179,14 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 		if req.GetShowDeleted() != pt.ShowDeleted {
 			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
 		}
-		minID = pt.MinimumID
+		minIndex = pt.MinimumIndex
 		delete(f.pageTokens, token)
 	}
 
 	// Start adding tasks that we will return.
 	res := &pb.ListTasksResponse{}
-	for i := minID - 1; i < len(f.tasks) && len(res.GetTasks()) <= int(pageSize); i++ {
-		task := f.tasks[i]
+	for idx := minIndex; idx < len(f.tasks) && len(res.GetTasks()) <= int(pageSize); idx++ {
+		task := f.tasks[idx]
 		if expiry := task.GetExpiryTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
 			continue
 		}
@@ -143,15 +201,11 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 		nextTask := res.GetTasks()[len(res.GetTasks())-1]
 		res.Tasks = res.GetTasks()[:pageSize]
 
-		nextMinID, err := strconv.Atoi(strings.TrimPrefix(nextTask.GetName(), "tasks/"))
-		if err != nil {
-			glog.Error(err)
-			return nil, internalError
-		}
+		nextMinIndex := f.taskIndices[nextTask.GetName()]
 		token := uuid.NewString()
 		f.pageTokens[token] = pageToken{
-			MinimumID:   nextMinID,
-			ShowDeleted: req.GetShowDeleted(),
+			MinimumIndex: nextMinIndex,
+			ShowDeleted:  req.GetShowDeleted(),
 		}
 		res.NextPageToken = token
 	}
@@ -166,14 +220,26 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 	if task.GetCompleted() {
 		return nil, status.Error(codes.InvalidArgument, "The task must not already be completed.")
 	}
-	created := proto.Clone(task).(*pb.Task)
+
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	if parent := task.GetParent(); parent != "" {
+		if err := validateName(parent); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, `The name of the parent must follow the format "tasks/{task}", but it was %q.`, parent)
+		}
+		if _, ok := f.taskIndices[parent]; !ok {
+			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
+		}
+	}
+
+	created := proto.Clone(task).(*pb.Task)
 	id := f.nextID
 	f.nextID++
 	created.Name = "tasks/" + fmt.Sprint(id)
 	created.CreateTime = timestamppb.New(f.now())
 	f.tasks = append(f.tasks, created)
+	f.taskIndices[created.Name] = len(f.tasks) - 1
 	return created, nil
 }
 
@@ -185,12 +251,8 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if !strings.HasPrefix(name, "tasks/") {
+	if err := validateName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
-	}
-	id, err := strconv.ParseInt(strings.TrimPrefix(name, "tasks/"), 10, 64)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	updateMask := req.GetUpdateMask()
 	if updateMask == nil {
@@ -216,8 +278,8 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 	}
 	for _, path := range updateMask.GetPaths() {
 		switch path {
-		case "completed", "create_time", "name":
-			return nil, status.Errorf(codes.InvalidArgument, "The field %q cannot be updated with UpdateTask.")
+		case "parent", "completed", "create_time", "name":
+			return nil, status.Errorf(codes.InvalidArgument, "The field %q cannot be updated with UpdateTask.", path)
 		case "*":
 			// We handled the only valid case of giving a wildcard path above,
 			// i.e., when it is the only path.
@@ -234,8 +296,8 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	idx := id - 1
-	if int(idx) >= len(f.tasks) {
+	idx, ok := f.taskIndices[name]
+	if !ok {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	task := f.tasks[idx]
@@ -260,25 +322,38 @@ func (f *Fake) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*pb.T
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if !strings.HasPrefix(name, "tasks/") {
+	if err := validateName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
-	}
-	id, err := strconv.ParseInt(strings.TrimPrefix(name, "tasks/"), 10, 64)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	deleted := f.tasks[id-1]
-	if deleted.GetDeleteTime().IsValid() {
+	idx, ok := f.taskIndices[name]
+	if !ok {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
+	root := f.tasks[idx]
+	if root.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	descendantIndices := f.descendantIndices(name)
+	if len(descendantIndices) > 0 && req.GetForce() == false {
+		return nil, status.Errorf(codes.FailedPrecondition, "Task %q has children; not deleting without `force: true`.", name)
+	}
 	now := f.now()
-	deleted.DeleteTime = timestamppb.New(now)
-	deleted.ExpiryTime = timestamppb.New(now.AddDate(0 /*years*/, 0 /*months*/, 30 /*days*/))
-	return proto.Clone(deleted).(*pb.Task), nil
+	toDeleteIndices := append([]int{idx}, descendantIndices...)
+	for _, i := range toDeleteIndices {
+		deleted := f.tasks[i]
+		// If one of the descendants has already been deleted earlier, skip over
+		// it.
+		if dt := deleted.GetDeleteTime(); dt.IsValid() && !dt.AsTime().IsZero() {
+			continue
+		}
+		deleted.DeleteTime = timestamppb.New(now)
+		deleted.ExpiryTime = timestamppb.New(now.AddDate(0 /*years*/, 0 /*months*/, 30 /*days*/))
+	}
+	return proto.Clone(root).(*pb.Task), nil
 }
 
 func (f *Fake) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest) (*pb.Task, error) {
@@ -286,28 +361,39 @@ func (f *Fake) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest) (*
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if !strings.HasPrefix(name, "tasks/") {
+	if err := validateName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
-	}
-	id, err := strconv.ParseInt(strings.TrimPrefix(name, "tasks/"), 10, 64)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	idx := id - 1
-	if int(idx) >= len(f.tasks) {
+	idx, ok := f.taskIndices[name]
+	if !ok {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
-	task := f.tasks[idx]
-	if !task.GetDeleteTime().IsValid() {
+	if !f.tasks[idx].GetDeleteTime().IsValid() {
 		return nil, status.Errorf(codes.AlreadyExists, "A task with name %q already exists.", name)
 	}
-	task.DeleteTime = nil
-	task.ExpiryTime = nil
-	return proto.Clone(task).(*pb.Task), nil
+	var toUndeleteIndices []int
+	for _, ancestorIndex := range f.ancestorIndices(name) {
+		if f.tasks[ancestorIndex].GetDeleteTime().IsValid() {
+			toUndeleteIndices = append(toUndeleteIndices, ancestorIndex)
+		}
+	}
+	if len(toUndeleteIndices) > 0 && !req.GetUndeleteAncestors() {
+		return nil, status.Errorf(codes.FailedPrecondition, "Task %q has deleted ancestors but `undelete_ancestors` was not set to `true`.", name)
+	}
+	if req.GetUndeleteDescendants() {
+		toUndeleteIndices = append(toUndeleteIndices, f.descendantIndices(name)...)
+	}
+	toUndeleteIndices = append(toUndeleteIndices, idx)
+	for _, i := range toUndeleteIndices {
+		task := f.tasks[i]
+		task.DeleteTime = nil
+		task.ExpiryTime = nil
+	}
+	return proto.Clone(f.tasks[idx]).(*pb.Task), nil
 }
 
 // now returns time.Now() except if f.clock is non-nil, then that clock is used
