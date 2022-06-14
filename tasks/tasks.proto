@@ -53,11 +53,14 @@ message Task {
     // When the task was created.
     google.protobuf.Timestamp create_time = 6;
 
+    // When the task was last updated, if ever.
+    google.protobuf.Timestamp update_time = 7;
+
     // When the task was last soft deleted, if ever.
-    google.protobuf.Timestamp delete_time = 7;
+    google.protobuf.Timestamp delete_time = 8;
 
     // When the task will be permanently deleted after being soft deleted.
-    google.protobuf.Timestamp expiry_time = 8;
+    google.protobuf.Timestamp expiry_time = 9;
 }
 
 message GetTaskRequest {

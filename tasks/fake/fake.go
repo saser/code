@@ -304,17 +304,20 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 	if task.GetDeleteTime().IsValid() {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
-	task = proto.Clone(task).(*pb.Task)
+	updated := proto.Clone(task).(*pb.Task)
 	for _, path := range updateMask.GetPaths() {
 		switch path {
 		case "title":
-			task.Title = patch.GetTitle()
+			updated.Title = patch.GetTitle()
 		case "description":
-			task.Description = patch.GetDescription()
+			updated.Description = patch.GetDescription()
 		}
 	}
-	f.tasks[idx] = task
-	return task, nil
+	if !proto.Equal(task, updated) {
+		updated.UpdateTime = timestamppb.New(f.now())
+	}
+	f.tasks[idx] = updated
+	return updated, nil
 }
 
 func (f *Fake) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*pb.Task, error) {

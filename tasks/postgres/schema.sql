@@ -8,6 +8,7 @@ CREATE TABLE tasks (
     description TEXT NOT NULL,
     completed BOOLEAN NOT NULL,
     create_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    update_time TIMESTAMP WITH TIME ZONE, -- If non-null, then task has been updated at least once.
     delete_time TIMESTAMP WITH TIME ZONE, -- If non-null, then task is considered deleted.
     expiry_time TIMESTAMP WITH TIME ZONE,
 

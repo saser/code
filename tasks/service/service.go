@@ -421,49 +421,70 @@ func (s *Service) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*p
 	// The path(s) fully specify what we should get from the patch. It may still
 	// be the case that the patch is empty.
 
-	updatedTask := &pb.Task{
-		Name: name,
-	}
+	// updatedTask is the new version of the task that should eventually be
+	// returned as the result of the update operation -- even if it is a no-op.
+	var updatedTask *pb.Task
+
 	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		// Special case: the patch is empty so we should just return the current
-		// version of the task.
-		if proto.Equal(patch, &pb.Task{Name: name} /* empty patch except for the name */) {
-			var err error
-			updatedTask, err = queryTaskByID(ctx, tx, id, false /*showDeleted*/)
+		// Eventually, we need to return either an error or the task, regardless
+		// of whether it has been updated or not. So let's fetch it here, so we
+		// quickly find out if it doesn't exist. If it does exist, we also get
+		// all the details we eventually need to return about it.
+		updatedTask, err = queryTaskByID(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
 			return err
 		}
+		// Special case: the patch is empty so we should just return the current
+		// version of the task which we fetched above.
+		if proto.Equal(patch, &pb.Task{Name: name} /* empty patch except for the name */) {
+			return nil
+		}
+		// Special case: the update mask is empty, meaning that the operation
+		// will be a no-op even if the patch isn't empty.
+		if len(updateMask.GetPaths()) == 0 {
+			return nil
+		}
+		// Special case: the patch isn't empty and at least one path is
+		// specified, but the applying the patch will yield an identical
+		// resource.
+		afterPatch := proto.Clone(updatedTask).(*pb.Task)
+		proto.Merge(afterPatch, patch)
+		if proto.Equal(afterPatch, updatedTask) {
+			return nil
+		}
+
+		updateTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		updatedTask.UpdateTime = timestamppb.New(updateTime)
+
 		// Update only the columns corresponding to the fields in the patch.
 		q := postgres.StatementBuilder.
 			Update("tasks").
 			Where(squirrel.Eq{
-				"id":          id,
-				"delete_time": nil,
-			})
+				"id": id,
+			}).
+			Set("update_time", updateTime)
 		for _, path := range updateMask.GetPaths() {
 			switch path {
 			case "title":
-				q = q.Set("title", patch.GetTitle())
+				v := patch.GetTitle()
+				q = q.Set("title", v)
+				updatedTask.Title = v
 			case "description":
-				q = q.Set("description", patch.GetDescription())
+				v := patch.GetDescription()
+				q = q.Set("description", v)
+				updatedTask.Description = v
 			}
 		}
-		q = q.Suffix("RETURNING title, description, completed, create_time")
 
 		sql, args, err := q.ToSql()
 		if err != nil {
 			return err
 		}
-		var createTime time.Time
-		if err := tx.QueryRow(ctx, sql, args...).Scan(
-			&updatedTask.Title,
-			&updatedTask.Description,
-			&updatedTask.Completed,
-			&createTime,
-		); err != nil {
-			return err
-		}
-		updatedTask.CreateTime = timestamppb.New(createTime)
-		return nil
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
 	}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", patch.GetName())
@@ -747,14 +768,17 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 	task := &pb.Task{
 		Name: "tasks/" + fmt.Sprint(id),
 	}
+	var parent *int64
 	var createTime time.Time
-	var deleteTime, expiryTime pgtype.Timestamptz
+	var deleteTime, expiryTime, updateTime pgtype.Timestamptz
 	st := postgres.StatementBuilder.
 		Select(
+			"parent",
 			"title",
 			"description",
 			"completed",
 			"create_time",
+			"update_time",
 			"delete_time",
 			"expiry_time",
 		)
@@ -773,14 +797,19 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 		return nil, err
 	}
 	if err := tx.QueryRow(ctx, sql, args...).Scan(
+		&parent,
 		&task.Title,
 		&task.Description,
 		&task.Completed,
 		&createTime,
+		&updateTime,
 		&deleteTime,
 		&expiryTime,
 	); err != nil {
 		return nil, err
+	}
+	if parent != nil {
+		task.Parent = fmt.Sprintf("tasks/%d", *parent)
 	}
 	task.CreateTime = timestamppb.New(createTime)
 	if deleteTime.Status == pgtype.Present {
@@ -788,6 +817,9 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 	}
 	if expiryTime.Status == pgtype.Present {
 		task.ExpiryTime = timestamppb.New(expiryTime.Time)
+	}
+	if updateTime.Status == pgtype.Present {
+		task.UpdateTime = timestamppb.New(updateTime.Time)
 	}
 	return task, nil
 }

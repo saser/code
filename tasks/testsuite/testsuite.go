@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func taskLessFunc(t1, t2 *pb.Task) bool {
@@ -743,11 +744,18 @@ func (s *Suite) TestCreateTask_Error() {
 func (s *Suite) TestUpdateTask() {
 	t := s.T()
 	ctx := context.Background()
+	// Clock will be reset to createTime before the task is created.
+	createTime := s.clock.Now()
+	createTimeMessage := timestamppb.New(createTime)
+	// Clock will be advanced to updateTime before the task is updated but after
+	// it has been created.
+	updateTime := createTime.Add(30 * time.Minute)
+	updateTimeMessage := timestamppb.New(updateTime)
 	for _, tt := range []struct {
 		name string
 		task *pb.Task
 		req  *pb.UpdateTaskRequest // will be updated in-place with the created task name
-		want *pb.Task              // will be updated in-place with the creation time
+		want *pb.Task              // will be updated in-place with the created task name
 	}{
 		{
 			name: "EmptyUpdate_NilUpdateMask",
@@ -759,7 +767,9 @@ func (s *Suite) TestUpdateTask() {
 				UpdateMask: nil,
 			},
 			want: &pb.Task{
-				Title: "Before the update",
+				Title:      "Before the update",
+				CreateTime: createTimeMessage,
+				UpdateTime: nil, // Task shouldn't be updated.
 			},
 		},
 		{
@@ -772,7 +782,9 @@ func (s *Suite) TestUpdateTask() {
 				UpdateMask: &fieldmaskpb.FieldMask{},
 			},
 			want: &pb.Task{
-				Title: "Before the update",
+				Title:      "Before the update",
+				CreateTime: createTimeMessage,
+				UpdateTime: nil, // Task shouldn't be updated.
 			},
 		},
 		{
@@ -785,7 +797,9 @@ func (s *Suite) TestUpdateTask() {
 				UpdateMask: nil,
 			},
 			want: &pb.Task{
-				Title: "After the update",
+				Title:      "After the update",
+				CreateTime: createTimeMessage,
+				UpdateTime: updateTimeMessage,
 			},
 		},
 		{
@@ -798,7 +812,9 @@ func (s *Suite) TestUpdateTask() {
 				UpdateMask: &fieldmaskpb.FieldMask{},
 			},
 			want: &pb.Task{
-				Title: "After the update",
+				Title:      "After the update",
+				CreateTime: createTimeMessage,
+				UpdateTime: updateTimeMessage,
 			},
 		},
 		{
@@ -816,7 +832,9 @@ func (s *Suite) TestUpdateTask() {
 				},
 			},
 			want: &pb.Task{
-				Title: "After the update",
+				Title:      "After the update",
+				CreateTime: createTimeMessage,
+				UpdateTime: updateTimeMessage,
 			},
 		},
 		{
@@ -834,6 +852,8 @@ func (s *Suite) TestUpdateTask() {
 			want: &pb.Task{
 				Title:       "After the update",
 				Description: "Added a description",
+				CreateTime:  createTimeMessage,
+				UpdateTime:  updateTimeMessage,
 			},
 		},
 		{
@@ -851,6 +871,8 @@ func (s *Suite) TestUpdateTask() {
 			want: &pb.Task{
 				Title:       "After the update",
 				Description: "Added a description",
+				CreateTime:  createTimeMessage,
+				UpdateTime:  updateTimeMessage,
 			},
 		},
 		{
@@ -873,6 +895,8 @@ func (s *Suite) TestUpdateTask() {
 			want: &pb.Task{
 				Title:       "After the update",
 				Description: "Added a description",
+				CreateTime:  createTimeMessage,
+				UpdateTime:  updateTimeMessage,
 			},
 		},
 		{
@@ -892,11 +916,13 @@ func (s *Suite) TestUpdateTask() {
 			want: &pb.Task{
 				Title:       "After the update",
 				Description: "Added a description",
+				CreateTime:  createTimeMessage,
+				UpdateTime:  updateTimeMessage,
 			},
 		},
 		{
 			// An empty/default value for `description` with a wildcard update
-			// mask shoul result in description being cleared.
+			// mask should result in description being cleared.
 			name: "RemoveDescription",
 			task: &pb.Task{
 				Title:       "Before the update",
@@ -914,18 +940,53 @@ func (s *Suite) TestUpdateTask() {
 			want: &pb.Task{
 				Title:       "After the update",
 				Description: "",
+				CreateTime:  createTimeMessage,
+				UpdateTime:  updateTimeMessage,
+			},
+		},
+		{
+			// Trying to update the task with identical values should be a
+			// no-op. This should be indicated by a missing `update_time` value.
+			name: "IdenticalTitle",
+			task: &pb.Task{
+				Title: "Before the update",
+			},
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Title:       "Before the update",
+					Description: "",
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"title"},
+				},
+			},
+			want: &pb.Task{
+				Title:      "Before the update",
+				CreateTime: createTimeMessage,
+				UpdateTime: nil, // Task shouldn't be updated.
 			},
 		},
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			// We need to reset the time to creatTime.
+			// We want to find `d` such that `now + d = createTime.`
+			// Therefore `d = createTime - now.`
+			s.clock.Advance(createTime.Sub(s.clock.Now()))
+
 			task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
 				Task: tt.task,
 			})
+
+			// Before we do the update we advance time, so that `update_time` is
+			// not the same as `create_time`.
+			s.clock.Advance(30 * time.Minute)
+
+			// Below we do the actual update.
 			tt.req.Task.Name = task.GetName()
-			tt.want.CreateTime = task.GetCreateTime()
+			tt.want.Name = task.GetName()
 			got := s.client.UpdateTaskT(ctx, t, tt.req)
-			if diff := cmp.Diff(tt.want, got, protocmp.Transform(), protocmp.IgnoreFields(got, "name")); diff != "" {
+			if diff := cmp.Diff(tt.want, got, protocmp.Transform()); diff != "" {
 				t.Errorf("unexpected result of update (-want +got)\n%s", diff)
 			}
 			// Getting the task again should produce the same result as after
@@ -933,10 +994,120 @@ func (s *Suite) TestUpdateTask() {
 			got = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
 				Name: task.GetName(),
 			})
-			if diff := cmp.Diff(tt.want, got, protocmp.Transform(), protocmp.IgnoreFields(got, "name")); diff != "" {
+			if diff := cmp.Diff(tt.want, got, protocmp.Transform()); diff != "" {
 				t.Errorf("unexpected result of GetTask after update (-want +got)\n%s", diff)
 			}
 		})
+	}
+}
+
+func (s *Suite) TestUpdateTask_WithChildren() {
+	t := s.T()
+	ctx := context.Background()
+
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "parent",
+		},
+	})
+	child := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Parent: parent.GetName(),
+			Title:  "child",
+		},
+	})
+
+	// Ensure update happens after creation.
+	s.clock.Advance(30 * time.Minute)
+
+	// Update the parent. Assert that only the parent changed.
+	{
+		const newTitle = "parent, now updated"
+		parent.Title = newTitle
+		parent.UpdateTime = timestamppb.New(s.clock.Now())
+		gotParent := s.client.UpdateTaskT(ctx, t, &pb.UpdateTaskRequest{
+			Task: &pb.Task{
+				Name:  parent.GetName(),
+				Title: newTitle,
+			},
+		})
+		if diff := cmp.Diff(parent, gotParent, protocmp.Transform()); diff != "" {
+			t.Errorf("update parent: unexpected result of update (-want +got)\n%s", diff)
+		}
+		gotChild := s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+			Name: child.GetName(),
+		})
+		if diff := cmp.Diff(child, gotChild, protocmp.Transform()); diff != "" {
+			t.Errorf("update parent: unexpected result of getting child (-want +got)\n%s", diff)
+		}
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	// Ensure update happens after previous update.
+	s.clock.Advance(30 * time.Minute)
+
+	// Update the child. Assert that only the child changed.
+	{
+		const newTitle = "child, now updated"
+		child.Title = newTitle
+		child.UpdateTime = timestamppb.New(s.clock.Now())
+		gotChild := s.client.UpdateTaskT(ctx, t, &pb.UpdateTaskRequest{
+			Task: &pb.Task{
+				Name:  child.GetName(),
+				Title: newTitle,
+			},
+		})
+		if diff := cmp.Diff(child, gotChild, protocmp.Transform()); diff != "" {
+			t.Errorf("update child: unexpected result of update (-want +got)\n%s", diff)
+		}
+		gotParent := s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+			Name: parent.GetName(),
+		})
+		if diff := cmp.Diff(parent, gotParent, protocmp.Transform()); diff != "" {
+			t.Errorf("update parent: unexpected result of getting child (-want +got)\n%s", diff)
+		}
+	}
+}
+
+func (s *Suite) TestUpdateTask_MultipleUpdates() {
+	t := s.T()
+	ctx := context.Background()
+
+	// This test asserts that the update time is changed everytime the task is
+	// updated.
+
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "some task",
+		},
+	})
+
+	// First update.
+	{
+		s.clock.Advance(15 * time.Minute)
+		task.Title = "some task, now with an updated title"
+		task.UpdateTime = timestamppb.New(s.clock.Now())
+		gotTask := s.client.UpdateTaskT(ctx, t, &pb.UpdateTaskRequest{
+			Task: task,
+		})
+		if diff := cmp.Diff(task, gotTask, protocmp.Transform()); diff != "" {
+			t.Fatalf("Unexpected result after first update (-want +got)\n%s", diff)
+		}
+	}
+
+	// Second update.
+	{
+		s.clock.Advance(2 * time.Hour)
+		task.Description = "now with an added description"
+		task.UpdateTime = timestamppb.New(s.clock.Now())
+		gotTask := s.client.UpdateTaskT(ctx, t, &pb.UpdateTaskRequest{
+			Task: task,
+		})
+		if diff := cmp.Diff(task, gotTask, protocmp.Transform()); diff != "" {
+			t.Fatalf("Unexpected result after first update (-want +got)\n%s", diff)
+		}
 	}
 }
 
