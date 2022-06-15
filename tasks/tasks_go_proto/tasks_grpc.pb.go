@@ -8,6 +8,7 @@ package tasks_go_proto
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -122,24 +123,28 @@ type TasksServer interface {
 }
 
 // UnimplementedTasksServer must be embedded to have forward compatible implementations.
-type UnimplementedTasksServer struct {
-}
+type UnimplementedTasksServer struct{}
 
 func (UnimplementedTasksServer) GetTask(context.Context, *GetTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTask not implemented")
 }
+
 func (UnimplementedTasksServer) ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListTasks not implemented")
 }
+
 func (UnimplementedTasksServer) CreateTask(context.Context, *CreateTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateTask not implemented")
 }
+
 func (UnimplementedTasksServer) UpdateTask(context.Context, *UpdateTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateTask not implemented")
 }
+
 func (UnimplementedTasksServer) DeleteTask(context.Context, *DeleteTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteTask not implemented")
 }
+
 func (UnimplementedTasksServer) UndeleteTask(context.Context, *UndeleteTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UndeleteTask not implemented")
 }
