@@ -92,3 +92,21 @@ func (c *testClient) UndeleteTaskT(ctx context.Context, tb testing.TB, req *pb.U
 	}
 	return task
 }
+
+func (c *testClient) CompleteTaskT(ctx context.Context, tb testing.TB, req *pb.CompleteTaskRequest) *pb.Task {
+	tb.Helper()
+	task, err := c.CompleteTask(ctx, req)
+	if err != nil {
+		tb.Fatalf("CompleteTask(%v) err = %v; want nil", req, err)
+	}
+	return task
+}
+
+func (c *testClient) UncompleteTaskT(ctx context.Context, tb testing.TB, req *pb.UncompleteTaskRequest) *pb.Task {
+	tb.Helper()
+	task, err := c.UncompleteTask(ctx, req)
+	if err != nil {
+		tb.Fatalf("UncompleteTask(%v) err = %v; want nil", req, err)
+	}
+	return task
+}

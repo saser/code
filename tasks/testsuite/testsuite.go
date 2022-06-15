@@ -583,6 +583,26 @@ func (s *Suite) TestListTasks_ChangeRequestBetweenPages() {
 	}
 }
 
+// Regression test for a bug. The Postgres implementation had didn't set the
+// `update_time` and `completed` fields correctly when listing tasks.
+func (s *Suite) TestListTasks_IncludesCompleted() {
+	t := s.T()
+	ctx := context.Background()
+
+	tasks := s.client.CreateTasksT(ctx, t, []*pb.Task{
+		{Title: "kick ass"},
+		{Title: "chew bubblegum"},
+	})
+	s.clock.Advance(30 * time.Hour)
+	tasks[0] = s.client.CompleteTaskT(ctx, t, &pb.CompleteTaskRequest{Name: tasks[0].GetName()})
+
+	res := s.client.ListTasksT(ctx, t, &pb.ListTasksRequest{})
+	less := func(t1, t2 *pb.Task) bool { return t1.GetName() < t2.GetName() }
+	if diff := cmp.Diff(tasks, res.GetTasks(), protocmp.Transform(), cmpopts.SortSlices(less)); diff != "" {
+		t.Fatalf("Unexpected diff when listing tasks (-want +got)\n%s", diff)
+	}
+}
+
 func (s *Suite) TestListTasks_Error() {
 	t := s.T()
 	ctx := context.Background()
@@ -1778,6 +1798,710 @@ func (s *Suite) TestUndeleteTask_Error() {
 			if got, want := status.Code(err), tt.want; got != want {
 				t.Errorf("UndeleteTask(%v) code = %v; want %v", tt.req, got, want)
 				t.Logf("err = %v", err)
+			}
+		})
+	}
+}
+
+// Test ideas:
+// [x] Completing a deleted task should return NotFound
+// [x] Completing a task with uncompleted children should fail with FailedPrecondition
+// [x] Completing a task with completed children and `force: false` should succeed.
+// [x] Completing a task with children should complete all descendants with `force: true`
+// [x] Uncompleting a task with completed ancestors should fail with FailedPrecondition
+// [x] Uncompleting a task with uncompleted ancestors should succeed
+// [x] Uncompleting a task with completed ancestors and `uncomplete_ancestors: true` should succeed
+// [ ] Uncompleting an uncompleted task should be a no-op
+// [ ] Uncompleting a completed task with completed children should only uncomplete the task itself
+// [ ] Uncompleting a completed task with completed children should uncomplete all children with `uncomplete_children: true`
+// [ ] Uncompleting a completed task with both completed ancestors and completed
+//     children should uncomplete everything with `uncomplete_ancestors: true
+//     uncomplete_descendants: true`
+// [x] Uncompleting a deleted task should return NotFound
+// [x] The usual errors with invalid names, empty names, etc
+
+func (s *Suite) TestCompleteTask_UncompleteTask_ClearsCompleteTime() {
+	t := s.T()
+	ctx := context.Background()
+
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "Get swole",
+		},
+	})
+
+	// Complete the task after 30 minutes.
+	{
+		s.clock.Advance(30 * time.Minute)
+		task.Completed = true
+		now := s.clock.Now()
+		task.CompleteTime = timestamppb.New(now)
+		task.UpdateTime = timestamppb.New(now)
+		req := &pb.CompleteTaskRequest{
+			Name: task.GetName(),
+		}
+		got := s.client.CompleteTaskT(ctx, t, req)
+		if diff := cmp.Diff(task, got, protocmp.Transform()); diff != "" {
+			t.Fatalf("CompleteTask(%v) produced unexpected result (-want +got)\n%s", req, diff)
+		}
+	}
+
+	// Uncomplete the task after another 30 minutes.
+	{
+		s.clock.Advance(30 * time.Minute)
+		task.Completed = false
+		task.CompleteTime = nil
+		task.UpdateTime = timestamppb.New(s.clock.Now())
+		req := &pb.UncompleteTaskRequest{
+			Name: task.GetName(),
+		}
+		got := s.client.UncompleteTaskT(ctx, t, req)
+		if diff := cmp.Diff(task, got, protocmp.Transform()); diff != "" {
+			t.Fatalf("UncompleteTask(%v) produced unexpected result (-want +got)\n%s", req, diff)
+		}
+	}
+}
+
+func (s *Suite) TestCompleteTask_WithChildren() {
+	t := s.T()
+	ctx := context.Background()
+
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "parent",
+		},
+	})
+	child := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "child",
+			Parent: parent.GetName(),
+		},
+	})
+
+	// Completing the parent with `force: false` should fail.
+	{
+		req := &pb.CompleteTaskRequest{
+			Name:  parent.GetName(),
+			Force: false,
+		}
+		_, err := s.client.CompleteTask(ctx, req)
+		if got, want := status.Code(err), codes.FailedPrecondition; got != want {
+			t.Fatalf("CompleteTask(%v) err = %v; want code %v", req, err, want)
+		}
+	}
+
+	// Completing the parent with `force: true` should succeed and leave both
+	// parent and child completed.
+	{
+		// We set up `parent` and `child` to be what we expect, and we will
+		// compare against it later.
+		now := s.clock.Now()
+		parent.Completed = true
+		parent.CompleteTime = timestamppb.New(now)
+		parent.UpdateTime = timestamppb.New(now)
+		child.Completed = true
+		child.CompleteTime = timestamppb.New(now)
+		child.UpdateTime = timestamppb.New(now)
+
+		req := &pb.CompleteTaskRequest{
+			Name:  parent.GetName(),
+			Force: true,
+		}
+		gotParent := s.client.CompleteTaskT(ctx, t, req)
+		if diff := cmp.Diff(parent, gotParent, protocmp.Transform()); diff != "" {
+			t.Errorf("parent: unexpected result of CompleteTask(%v) (-want +got)\n%s", req, diff)
+		}
+		gotChild := s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+			Name: child.GetName(),
+		})
+		if diff := cmp.Diff(child, gotChild, protocmp.Transform()); diff != "" {
+			t.Errorf("child: unexpected result of CompleteTask(%v) (-want +got)\n%s", req, diff)
+		}
+	}
+}
+
+func (s *Suite) TestCompleteTask_WithChildren_AllChildrenCompleted() {
+	t := s.T()
+	ctx := context.Background()
+
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "parent",
+		},
+	})
+	child := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "child",
+			Parent: parent.GetName(),
+		},
+	})
+
+	// Complete the child some time after it has been created.
+	s.clock.Advance(15 * time.Minute)
+	child = s.client.CompleteTaskT(ctx, t, &pb.CompleteTaskRequest{
+		Name: child.GetName(),
+	})
+
+	// Let some time pass between completing the child and completing the
+	// parent.
+	s.clock.Advance(4 * time.Hour)
+
+	// Completing the parent with `force: false` should succeed and leave both
+	// parent and child completed.
+	now := s.clock.Now()
+	parent.Completed = true
+	parent.CompleteTime = timestamppb.New(now)
+	parent.UpdateTime = timestamppb.New(now)
+	req := &pb.CompleteTaskRequest{
+		Name:  parent.GetName(),
+		Force: false,
+	}
+	gotParent := s.client.CompleteTaskT(ctx, t, req)
+	if diff := cmp.Diff(parent, gotParent, protocmp.Transform()); diff != "" {
+		t.Errorf("parent: unexpected result of CompleteTask(%v) (-want +got)\n%s", req, diff)
+	}
+	// The completion timestamp of child should not have been changed.
+	gotChild := s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+		Name: child.GetName(),
+	})
+	if diff := cmp.Diff(child, gotChild, protocmp.Transform()); diff != "" {
+		t.Errorf("child: unexpected result of CompleteTask(%v) (-want +got)\n%s", req, diff)
+	}
+}
+
+func (s *Suite) TestCompleteTask_AlreadyCompleted() {
+	t := s.T()
+	ctx := context.Background()
+
+	// When trying to complete a task that is already completed, it should be a
+	// no-op and the task should be returned unmodified. We detect this by
+	// simulating time passing, which should be the only change in the world
+	// between the various operations on the task.
+
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "Build stuff",
+		},
+	})
+
+	s.clock.Advance(30 * time.Minute)
+
+	first := s.client.CompleteTaskT(ctx, t, &pb.CompleteTaskRequest{
+		Name: task.GetName(),
+	})
+
+	s.clock.Advance(30 * time.Minute)
+
+	second := s.client.CompleteTaskT(ctx, t, &pb.CompleteTaskRequest{
+		Name: task.GetName(),
+	})
+	if diff := cmp.Diff(first, second, protocmp.Transform()); diff != "" {
+		t.Fatalf("Unexpected result of completing a second time (-first +second)\n%s", diff)
+	}
+}
+
+func (s *Suite) TestCompleteTask_Deleted() {
+	t := s.T()
+	ctx := context.Background()
+
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "should be deleted",
+		},
+	})
+	task = s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+		Name: task.GetName(),
+	})
+
+	req := &pb.CompleteTaskRequest{
+		Name: task.GetName(),
+	}
+	_, err := s.client.CompleteTask(ctx, req)
+	if got, want := status.Code(err), codes.NotFound; got != want {
+		t.Fatalf("CompleteTask(%v) err = %v; want code %v", req, err, want)
+	}
+}
+
+func (s *Suite) TestCompleteTask_Error() {
+	t := s.T()
+	ctx := context.Background()
+
+	for _, tt := range []struct {
+		name string
+		req  *pb.CompleteTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "EmptyName",
+			req: &pb.CompleteTaskRequest{
+				Name: "",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "InvalidName",
+			req: &pb.CompleteTaskRequest{
+				Name: "invalid/123",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "MissingResourceID",
+			req: &pb.CompleteTaskRequest{
+				Name: "tasks/",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "NotFound",
+			req: &pb.CompleteTaskRequest{
+				Name: "tasks/999",
+			},
+			want: codes.NotFound,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.client.CompleteTask(ctx, tt.req)
+			if got, want := status.Code(err), tt.want; got != want {
+				t.Fatalf("CompleteTask(%v) err = %v; want code %v", tt.req, err, want)
+			}
+		})
+	}
+}
+
+func (s *Suite) TestUncompleteTask_NotCompleted() {
+	t := s.T()
+	ctx := context.Background()
+
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "some task",
+		},
+	})
+
+	// Uncompleting a task that is not completed should be a no-op.
+	got := s.client.UncompleteTaskT(ctx, t, &pb.UncompleteTaskRequest{
+		Name: task.GetName(),
+	})
+	if diff := cmp.Diff(task, got, protocmp.Transform()); diff != "" {
+		t.Fatalf("Uncompleting an uncompleted task wasn't a no-op (-want +got)\n%s", diff)
+	}
+}
+
+func (s *Suite) TestUncompleteTask_WithParent() {
+	t := s.T()
+	ctx := context.Background()
+
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "parent",
+		},
+	})
+	child := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "child",
+			Parent: parent.GetName(),
+		},
+	})
+
+	// Let some time pass after creation and then complete both with `force:
+	// true`.
+	s.clock.Advance(12 * time.Hour)
+	parent = s.client.CompleteTaskT(ctx, t, &pb.CompleteTaskRequest{
+		Name:  parent.GetName(),
+		Force: true,
+	})
+	child = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+		Name: child.GetName(),
+	})
+
+	// Let some more time pass after completion.
+	s.clock.Advance(3 * time.Hour)
+
+	// Uncompleting `child` with `uncomplete_ancestors: false` should fail.
+	{
+		req := &pb.UncompleteTaskRequest{
+			Name:                child.GetName(),
+			UncompleteAncestors: false,
+		}
+		_, err := s.client.UncompleteTask(ctx, req)
+		if got, want := status.Code(err), codes.FailedPrecondition; got != want {
+			t.Fatalf("UncompleteTask(%v) err = %v; want code %v", req, err, want)
+		}
+	}
+
+	// Uncompleting `child` with `uncomplete_ancestors: true` should succeed and
+	// leave both `child` and `parent` completed.
+	{
+		// Set up `child` and `parent` so that we can compare with them later.
+		now := s.clock.Now()
+		child.Completed = false
+		child.CompleteTime = nil
+		child.UpdateTime = timestamppb.New(now)
+		parent.Completed = false
+		parent.CompleteTime = nil
+		parent.UpdateTime = timestamppb.New(now)
+
+		req := &pb.UncompleteTaskRequest{
+			Name:                child.GetName(),
+			UncompleteAncestors: true,
+		}
+		gotChild := s.client.UncompleteTaskT(ctx, t, req)
+		if diff := cmp.Diff(child, gotChild, protocmp.Transform()); diff != "" {
+			t.Errorf("child: unexpected result of UncompleteTask(%v) (-want +got)\n%s", req, diff)
+		}
+		gotParent := s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+			Name: parent.GetName(),
+		})
+		if diff := cmp.Diff(parent, gotParent, protocmp.Transform()); diff != "" {
+			t.Errorf("parent: unexpected result of UncompleteTask(%v) (-want +got)\n%s", req, diff)
+		}
+	}
+}
+
+func (s *Suite) TestUncompleteTask_WithParent_ParentUncompleted() {
+	t := s.T()
+	ctx := context.Background()
+
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "parent",
+		},
+	})
+	child := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "child",
+			Parent: parent.GetName(),
+		},
+	})
+
+	// Let some time pass after creation and then complete both with `force:
+	// true`.
+	s.clock.Advance(12 * time.Hour)
+	parent = s.client.CompleteTaskT(ctx, t, &pb.CompleteTaskRequest{
+		Name:  parent.GetName(),
+		Force: true,
+	})
+	child = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+		Name: child.GetName(),
+	})
+
+	// Let some more time pass after completion and then uncomplete `parent`.
+	// This should leave `child` still completed.
+	s.clock.Advance(3 * time.Hour)
+	{
+		req := &pb.UncompleteTaskRequest{
+			Name: parent.GetName(),
+		}
+		parent = s.client.UncompleteTaskT(ctx, t, req)
+		gotChild := s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+			Name: child.GetName(),
+		})
+		if diff := cmp.Diff(child, gotChild, protocmp.Transform()); diff != "" {
+			t.Fatalf("child: unexpected result of UncompleteTask(%v) (-want +got)\n%s", req, diff)
+		}
+	}
+
+	// Let yet more time pass and then uncomplete `child` with
+	// `uncomplete_ancestors: false`. This should succeed, and `parent` should
+	// be left untouched.
+	s.clock.Advance(14 * time.Hour)
+	{
+		// We will compare the result with `child`.
+		child.Completed = false
+		child.CompleteTime = nil
+		child.UpdateTime = timestamppb.New(s.clock.Now())
+
+		req := &pb.UncompleteTaskRequest{
+			Name:                child.GetName(),
+			UncompleteAncestors: false,
+		}
+		gotChild := s.client.UncompleteTaskT(ctx, t, req)
+		if diff := cmp.Diff(child, gotChild, protocmp.Transform()); diff != "" {
+			t.Errorf("child: unexpected result of UncompleteTask(%v) (-want +got)\n%s", req, diff)
+		}
+		// `parent` should be left untouched.
+		gotParent := s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+			Name: parent.GetName(),
+		})
+		if diff := cmp.Diff(parent, gotParent, protocmp.Transform()); diff != "" {
+			t.Errorf("parent: unexpected result of UncompleteTask(%v) (-want +got)\n%s", req, diff)
+		}
+	}
+}
+
+func (s *Suite) TestUncompleteTask_InHierarchy() {
+	t := s.T()
+	ctx := context.Background()
+
+	// Set up a hierarchy looking like
+	//     root -> middle -> leaf
+	// where "->" means "parent of".
+	root := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "root",
+		},
+	})
+	middle := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "middle",
+			Parent: root.GetName(),
+		},
+	})
+	leaf := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:  "leaf",
+			Parent: middle.GetName(),
+		},
+	})
+
+	// Complete all tasks, leaving us with
+	//     [root] -> [middle] -> [leaf]
+	// where "[x]" means "task x is completed".
+	root = s.client.CompleteTaskT(ctx, t, &pb.CompleteTaskRequest{
+		Name:  root.GetName(),
+		Force: true,
+	})
+	middle = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+		Name: middle.GetName(),
+	})
+	leaf = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+		Name: leaf.GetName(),
+	})
+	for _, task := range []*pb.Task{
+		root,
+		middle,
+		leaf,
+	} {
+		if got, want := task.GetCompleted(), true; got != want {
+			t.Errorf("Task %q has completed = %v; want %v", task.GetName(), got, want)
+		}
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	// First, we verify that a bunch of requests are invalid.
+	for _, tt := range []struct {
+		name string
+		req  *pb.UncompleteTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "Leaf_NoUncompleteAncestors",
+			req: &pb.UncompleteTaskRequest{
+				Name:                leaf.GetName(),
+				UncompleteAncestors: false,
+			},
+			want: codes.FailedPrecondition,
+		},
+		{
+			name: "Leaf_NoUncompleteAncestors_WithUncompleteDescendants",
+			req: &pb.UncompleteTaskRequest{
+				Name:                  leaf.GetName(),
+				UncompleteAncestors:   false,
+				UncompleteDescendants: true,
+			},
+			want: codes.FailedPrecondition,
+		},
+		{
+			name: "Middle_NoUncompleteAncestors",
+			req: &pb.UncompleteTaskRequest{
+				Name:                middle.GetName(),
+				UncompleteAncestors: false,
+			},
+			want: codes.FailedPrecondition,
+		},
+		{
+			name: "Middle_NoUncompleteAncestors_WithUncompleteDescendants",
+			req: &pb.UncompleteTaskRequest{
+				Name:                  middle.GetName(),
+				UncompleteAncestors:   false,
+				UncompleteDescendants: true,
+			},
+			want: codes.FailedPrecondition,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.client.UncompleteTask(ctx, tt.req)
+			if got, want := status.Code(err), tt.want; got != want {
+				t.Errorf("UncompleteTask(%v) err = %v; want code %v", tt.req, err, want)
+			}
+		})
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	for _, task := range []*pb.Task{
+		root,
+		middle,
+		leaf,
+	} {
+		if got, want := task.GetCompleted(), true; got != want {
+			t.Errorf("Task %q has completed = %v; want %v", task.GetName(), got, want)
+		}
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	// Next, we set up a bunch of test cases all assuming a starting state of
+	//     [root] -> [middle] -> [leaf].
+	// The test cases will issue an UncompleteTask RPC and then verify the
+	// `completed` state of the above tasks.
+	for _, tt := range []struct {
+		name string
+		req  *pb.UncompleteTaskRequest
+		want map[string]bool // task name -> whether it is _completed_
+	}{
+		{
+			name: "Root",
+			req: &pb.UncompleteTaskRequest{
+				Name: root.GetName(),
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): true,
+				leaf.GetName():   true,
+			},
+		},
+		{
+			name: "Root_UncompleteDescendants",
+			req: &pb.UncompleteTaskRequest{
+				Name:                  root.GetName(),
+				UncompleteDescendants: true,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   false,
+			},
+		},
+		{
+			name: "Leaf_UncompleteAncestors",
+			req: &pb.UncompleteTaskRequest{
+				Name:                leaf.GetName(),
+				UncompleteAncestors: true,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   false,
+			},
+		},
+		{
+			name: "Middle_UncompleteAncestors",
+			req: &pb.UncompleteTaskRequest{
+				Name:                middle.GetName(),
+				UncompleteAncestors: true,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   true,
+			},
+		},
+		{
+			name: "Middle_UncompleteDescendants_UncompleteAncestors",
+			req: &pb.UncompleteTaskRequest{
+				Name:                  middle.GetName(),
+				UncompleteAncestors:   true,
+				UncompleteDescendants: true,
+			},
+			want: map[string]bool{
+				root.GetName():   false,
+				middle.GetName(): false,
+				leaf.GetName():   false,
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange for all tasks to be restored to completed state when the
+			// test ends.
+			t.Cleanup(func() {
+				s.client.CompleteTaskT(ctx, t, &pb.CompleteTaskRequest{
+					Name:  root.GetName(),
+					Force: true,
+				})
+			})
+
+			s.client.UncompleteTaskT(ctx, t, tt.req)
+			got := make(map[string]bool)
+			for name := range tt.want {
+				got[name] = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: name}).GetCompleted()
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Fatalf("Unexpected result of UncompleteTask(%v), true == completed (-want +got)\n%s", tt.req, diff)
+			}
+		})
+	}
+}
+
+func (s *Suite) TestUncompleteTask_Deleted() {
+	t := s.T()
+	ctx := context.Background()
+
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "should be deleted",
+		},
+	})
+	task = s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+		Name: task.GetName(),
+	})
+
+	req := &pb.UncompleteTaskRequest{
+		Name: task.GetName(),
+	}
+	_, err := s.client.UncompleteTask(ctx, req)
+	if got, want := status.Code(err), codes.NotFound; got != want {
+		t.Fatalf("UncompleteTask(%v) err = %v; want code %v", req, err, want)
+	}
+}
+
+func (s *Suite) TestUncompleteTask_Error() {
+	t := s.T()
+	ctx := context.Background()
+
+	for _, tt := range []struct {
+		name string
+		req  *pb.UncompleteTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "EmptyName",
+			req: &pb.UncompleteTaskRequest{
+				Name: "",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "InvalidName",
+			req: &pb.UncompleteTaskRequest{
+				Name: "invalid/123",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "MissingResourceID",
+			req: &pb.UncompleteTaskRequest{
+				Name: "tasks/",
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "NotFound",
+			req: &pb.UncompleteTaskRequest{
+				Name: "tasks/999",
+			},
+			want: codes.NotFound,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.client.UncompleteTask(ctx, tt.req)
+			if got, want := status.Code(err), tt.want; got != want {
+				t.Fatalf("UncompleteTask(%v) err = %v; want code %v", tt.req, err, want)
 			}
 		})
 	}

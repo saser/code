@@ -37,6 +37,10 @@ type TasksClient interface {
 	// Undeletes a previously soft deleted task. Can only be done as long as the
 	// task has not been permanently deleted.
 	UndeleteTask(ctx context.Context, in *UndeleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Mark a task as completed.
+	CompleteTask(ctx context.Context, in *CompleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Mark a task as not completed.
+	UncompleteTask(ctx context.Context, in *UncompleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
 }
 
 type tasksClient struct {
@@ -101,6 +105,24 @@ func (c *tasksClient) UndeleteTask(ctx context.Context, in *UndeleteTaskRequest,
 	return out, nil
 }
 
+func (c *tasksClient) CompleteTask(ctx context.Context, in *CompleteTaskRequest, opts ...grpc.CallOption) (*Task, error) {
+	out := new(Task)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/CompleteTask", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) UncompleteTask(ctx context.Context, in *UncompleteTaskRequest, opts ...grpc.CallOption) (*Task, error) {
+	out := new(Task)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/UncompleteTask", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TasksServer is the server API for Tasks service.
 // All implementations must embed UnimplementedTasksServer
 // for forward compatibility
@@ -119,6 +141,10 @@ type TasksServer interface {
 	// Undeletes a previously soft deleted task. Can only be done as long as the
 	// task has not been permanently deleted.
 	UndeleteTask(context.Context, *UndeleteTaskRequest) (*Task, error)
+	// Mark a task as completed.
+	CompleteTask(context.Context, *CompleteTaskRequest) (*Task, error)
+	// Mark a task as not completed.
+	UncompleteTask(context.Context, *UncompleteTaskRequest) (*Task, error)
 	mustEmbedUnimplementedTasksServer()
 }
 
@@ -147,6 +173,14 @@ func (UnimplementedTasksServer) DeleteTask(context.Context, *DeleteTaskRequest) 
 
 func (UnimplementedTasksServer) UndeleteTask(context.Context, *UndeleteTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UndeleteTask not implemented")
+}
+
+func (UnimplementedTasksServer) CompleteTask(context.Context, *CompleteTaskRequest) (*Task, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CompleteTask not implemented")
+}
+
+func (UnimplementedTasksServer) UncompleteTask(context.Context, *UncompleteTaskRequest) (*Task, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UncompleteTask not implemented")
 }
 func (UnimplementedTasksServer) mustEmbedUnimplementedTasksServer() {}
 
@@ -269,6 +303,42 @@ func _Tasks_UndeleteTask_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Tasks_CompleteTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).CompleteTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/CompleteTask",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).CompleteTask(ctx, req.(*CompleteTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_UncompleteTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UncompleteTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).UncompleteTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/UncompleteTask",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).UncompleteTask(ctx, req.(*UncompleteTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Tasks_ServiceDesc is the grpc.ServiceDesc for Tasks service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -299,6 +369,14 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UndeleteTask",
 			Handler:    _Tasks_UndeleteTask_Handler,
+		},
+		{
+			MethodName: "CompleteTask",
+			Handler:    _Tasks_CompleteTask_Handler,
+		},
+		{
+			MethodName: "UncompleteTask",
+			Handler:    _Tasks_UncompleteTask_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

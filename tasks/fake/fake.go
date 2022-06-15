@@ -399,6 +399,99 @@ func (f *Fake) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest) (*
 	return proto.Clone(f.tasks[idx]).(*pb.Task), nil
 }
 
+func (f *Fake) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest) (*pb.Task, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if err := validateName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.taskIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	task := f.tasks[idx]
+	if task.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	// Special case: a completed task can be completed again, which is a no-op.
+	if task.GetCompleteTime().IsValid() {
+		return proto.Clone(task).(*pb.Task), nil
+	}
+	var toCompleteIndices []int
+	for _, idx := range f.descendantIndices(name) {
+		if f.tasks[idx].GetCompleteTime().IsValid() {
+			continue
+		}
+		toCompleteIndices = append(toCompleteIndices, idx)
+	}
+	if len(toCompleteIndices) > 0 && !req.GetForce() {
+		return nil, status.Errorf(codes.FailedPrecondition, "Task %q has uncompleted children but `force` was not set to true.", name)
+	}
+	toCompleteIndices = append(toCompleteIndices, idx)
+	now := f.now()
+	for _, idx := range toCompleteIndices {
+		completed := f.tasks[idx]
+		completed.Completed = true
+		completed.CompleteTime = timestamppb.New(now)
+		completed.UpdateTime = timestamppb.New(now)
+	}
+	return proto.Clone(task).(*pb.Task), nil
+}
+
+func (f *Fake) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequest) (*pb.Task, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if err := validateName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.taskIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	task := f.tasks[idx]
+	if task.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	// Special case: uncompleting an uncompleted task is a no-op.
+	if !task.GetCompleteTime().IsValid() {
+		return proto.Clone(task).(*pb.Task), nil
+	}
+	var toUncompleteIndices []int
+	for _, idx := range f.ancestorIndices(name) {
+		if !f.tasks[idx].GetCompleteTime().IsValid() {
+			continue
+		}
+		toUncompleteIndices = append(toUncompleteIndices, idx)
+	}
+	if len(toUncompleteIndices) > 0 && !req.GetUncompleteAncestors() {
+		return nil, status.Errorf(codes.FailedPrecondition, "Task %q has completed ancestors but `uncomplete_ancestors` was not set to true.", name)
+	}
+	if req.GetUncompleteDescendants() {
+		toUncompleteIndices = append(toUncompleteIndices, f.descendantIndices(name)...)
+	}
+	toUncompleteIndices = append(toUncompleteIndices, idx)
+	now := f.now()
+	for _, idx := range toUncompleteIndices {
+		uncompleted := f.tasks[idx]
+		uncompleted.Completed = false
+		uncompleted.CompleteTime = nil
+		uncompleted.UpdateTime = timestamppb.New(now)
+	}
+	return proto.Clone(task).(*pb.Task), nil
+}
+
 // now returns time.Now() except if f.clock is non-nil, then that clock is used
 // instead. now assumes that the mutex is held when called.
 func (f *Fake) now() time.Time {

@@ -172,12 +172,12 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 			// The eventual list of tasks to return.
 			tasks []*pb.Task
 			// The columns in the row.
-			id                     int64
-			title                  string
-			description            string
-			completed              bool
-			createTime             time.Time
-			deleteTime, expiryTime pgtype.Timestamptz
+			id                                 int64
+			title                              string
+			description                        string
+			completeTime                       pgtype.Timestamptz
+			createTime                         time.Time
+			updateTime, deleteTime, expiryTime pgtype.Timestamptz
 			// To use for the next page, if any.
 			nextMinID int64
 		)
@@ -186,8 +186,9 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 				"id",
 				"title",
 				"description",
-				"completed",
+				"complete_time",
 				"create_time",
+				"update_time",
 				"delete_time",
 				"expiry_time",
 			).
@@ -226,8 +227,14 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 				Name:        "tasks/" + fmt.Sprint(id),
 				Title:       title,
 				Description: description,
-				Completed:   completed,
 				CreateTime:  timestamppb.New(createTime),
+			}
+			if completeTime.Status == pgtype.Present {
+				task.CompleteTime = timestamppb.New(completeTime.Time)
+				task.Completed = true
+			}
+			if updateTime.Status == pgtype.Present {
+				task.UpdateTime = timestamppb.New(updateTime.Time)
 			}
 			if deleteTime.Status == pgtype.Present {
 				task.DeleteTime = timestamppb.New(deleteTime.Time)
@@ -245,8 +252,9 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 				&id,
 				&title,
 				&description,
-				&completed,
+				&completeTime,
 				&createTime,
+				&updateTime,
 				&deleteTime,
 				&expiryTime,
 			},
@@ -320,8 +328,8 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 		if err != nil {
 			return err
 		}
-		columns := []string{"title", "description", "completed", "create_time"}
-		values := []interface{}{task.GetTitle(), task.GetDescription(), task.GetCompleted(), now}
+		columns := []string{"title", "description", "create_time"}
+		values := []interface{}{task.GetTitle(), task.GetDescription(), now}
 		if parentID != -1 {
 			columns = append(columns, "parent")
 			values = append(values, parentID)
@@ -692,6 +700,185 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 	return task, nil
 }
 
+func (s *Service) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest) (*pb.Task, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if !strings.HasPrefix(name, "tasks/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	resourceID := strings.TrimPrefix(name, "tasks/")
+	if resourceID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(resourceID, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+
+	var task *pb.Task
+	errForceRequired := errors.New("`force: true` is required")
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		var err error
+		task, err = queryTaskByID(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		// Special case: a completed task can be completed again, which is a
+		// no-op.
+		if task.GetCompleteTime().IsValid() {
+			task.Completed = true
+			return nil
+		}
+		completeTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		descendantIDs, err := queryDescendantIDs(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		var toCompleteIDs []int64
+		for _, descID := range descendantIDs {
+			descendant, err := queryTaskByID(ctx, tx, descID, false /* showDeleted */)
+			if err != nil {
+				return err
+			}
+			if descendant.GetCompleteTime().IsValid() {
+				continue
+			}
+			toCompleteIDs = append(toCompleteIDs, descID)
+		}
+		if len(toCompleteIDs) > 0 && !req.GetForce() {
+			return errForceRequired
+		}
+		toCompleteIDs = append(toCompleteIDs, id)
+		task.Completed = true
+		task.CompleteTime = timestamppb.New(completeTime)
+		task.UpdateTime = timestamppb.New(completeTime)
+		sql, args, err := postgres.StatementBuilder.
+			Update("tasks").
+			SetMap(map[string]interface{}{
+				"complete_time": completeTime,
+				"update_time":   completeTime,
+			}).
+			Where(squirrel.Eq{
+				"id": toCompleteIDs,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+		}
+		if errors.Is(err, errForceRequired) {
+			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has uncompleted children but `force` was not set to true.", name)
+		}
+		glog.Error(err)
+		return nil, internalError
+	}
+	return task, nil
+}
+
+func (s *Service) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequest) (*pb.Task, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if !strings.HasPrefix(name, "tasks/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	resourceID := strings.TrimPrefix(name, "tasks/")
+	if resourceID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(resourceID, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+
+	var task *pb.Task
+	errUncompleteAncestorsRequired := errors.New("`uncomplete_ancestors: true` is required")
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		var err error
+		task, err = queryTaskByID(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		// Special case: uncompleting an uncompleted task is a no-op.
+		if !task.GetCompleteTime().IsValid() {
+			return nil
+		}
+		var toUncompleteIDs []int64
+		ancestorIDs, err := queryAncestorIDs(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		for _, id := range ancestorIDs {
+			ancestor, err := queryTaskByID(ctx, tx, id, false /* showDeleted */)
+			if err != nil {
+				return err
+			}
+			if !ancestor.GetCompleteTime().IsValid() {
+				continue
+			}
+			toUncompleteIDs = append(toUncompleteIDs, id)
+		}
+		if len(toUncompleteIDs) > 0 && !req.GetUncompleteAncestors() {
+			return errUncompleteAncestorsRequired
+		}
+		if req.GetUncompleteDescendants() {
+			descendantIDs, err := queryDescendantIDs(ctx, tx, id, false /* showDeleted */)
+			if err != nil {
+				return err
+			}
+			// Assumed invariant: if the task is completed, then all its
+			// descendants are also completed. Therefore we can blindly add all
+			// descendant IDs here without checking whether they are actually
+			// completed.
+			toUncompleteIDs = append(toUncompleteIDs, descendantIDs...)
+		}
+		toUncompleteIDs = append(toUncompleteIDs, id)
+		updateTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		task.Completed = false
+		task.CompleteTime = nil
+		task.UpdateTime = timestamppb.New(updateTime)
+		sql, args, err := postgres.StatementBuilder.
+			Update("tasks").
+			SetMap(map[string]interface{}{
+				"complete_time": nil,
+				"update_time":   updateTime,
+			}).
+			Where(squirrel.Eq{
+				"id": toUncompleteIDs,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+		}
+		if errors.Is(err, errUncompleteAncestorsRequired) {
+			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has completed ancestors but `uncomplete_ancestors` was not set to true.", name)
+		}
+		glog.Error(err)
+		return nil, internalError
+	}
+	return task, nil
+}
+
 // queryDescendantIDs returns the IDs of all tasks descending, directly or
 // transitively, from rootID. Note that rootID is itself not included in the
 // resulting slice. If showDeleted is true, IDs from deleted descendant tasks
@@ -769,6 +956,7 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 		Name: "tasks/" + fmt.Sprint(id),
 	}
 	var parent *int64
+	var completeTime pgtype.Timestamptz
 	var createTime time.Time
 	var deleteTime, expiryTime, updateTime pgtype.Timestamptz
 	st := postgres.StatementBuilder.
@@ -776,7 +964,7 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 			"parent",
 			"title",
 			"description",
-			"completed",
+			"complete_time",
 			"create_time",
 			"update_time",
 			"delete_time",
@@ -800,7 +988,7 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 		&parent,
 		&task.Title,
 		&task.Description,
-		&task.Completed,
+		&completeTime,
 		&createTime,
 		&updateTime,
 		&deleteTime,
@@ -810,6 +998,10 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 	}
 	if parent != nil {
 		task.Parent = fmt.Sprintf("tasks/%d", *parent)
+	}
+	if completeTime.Status == pgtype.Present {
+		task.Completed = true
+		task.CompleteTime = timestamppb.New(completeTime.Time)
 	}
 	task.CreateTime = timestamppb.New(createTime)
 	if deleteTime.Status == pgtype.Present {
