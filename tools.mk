@@ -33,7 +33,7 @@ $(gofumpt): go.mod | $(tools)
 		mvdan.cc/gofumpt
 
 # protoc: the protobuf compiler.
-protoc_version := 3.19.1
+protoc_version := 21.1
 protoc_archive := $(tools)/protoc_$(protoc_version).zip
 $(protoc_archive): | $(tools)
 	curl \
