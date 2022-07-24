@@ -71,3 +71,11 @@ container_pull(
     registry = "index.docker.io",
     repository = "library/hello-world",
 )
+
+container_pull(
+    name = "redis_image",
+    # tag = "7.0.4",
+    digest = "sha256:f39bd533478aa934b3376f85bf0771f37b6db30841bb043d0a5255db8987a496",
+    registry = "index.docker.io",
+    repository = "library/redis",
+)
