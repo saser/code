@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "redistest",
+    srcs = ["redistest.go"],
+    data = ["//redis:image.tar"],
+    importpath = "go.saser.se/redis/redistest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//docker/dockertest",
+        "@com_github_go_redis_redis_v9//:redis",
+    ],
+)
+
+go_test(
+    name = "redistest_test",
+    srcs = ["redistest_test.go"],
+    embed = [":redistest"],
+)
