@@ -4,8 +4,10 @@
 
 Requirements:
 
+*   `curl`.
 *   `make`.
-*   A Go toolchain (the `go` command must be available).
+*   `tar`.
+*   `unzip`.
 
 This repository uses [`bazelisk`](https://github.com/bazelbuild/bazelisk) to install and run Bazel. In other words, you don't need to install it yourself. `bazelisk` is invoked via a script called `bazel` in the root of the repository.
 
@@ -27,4 +29,5 @@ $ go get -u -t -tags=tools ./... # updates direct tool dependencies, see tools.g
 $ go mod tidy                    # clean up go.mod and go.sum
 $ make generate                  # regenerate code
 $ make fix                       # update repositories.bzl, BUILD files, etc
+$ make fix                       # possibly needed due to non-hermetic code formatters
 ```

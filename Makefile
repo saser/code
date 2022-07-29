@@ -1,6 +1,12 @@
 include tools.mk
 
-go_module := $(shell go list -m)
+# This needs to be kept in sync with go.mod.
+#
+# We could try to invike 'go list -m' but we also install the `go` command via
+# Make, which makes it hairy to make sure `go` is available before this is run.
+# Also, the module should change very rarely, so hard-coding the value seems
+# worth the tradeoff.
+go_module := go.saser.se
 
 build_files := $(shell git ls-files -- 'WORKSPACE' '**/BUILD.bazel' '*.bzl')
 go_files := $(shell git ls-files -- '*.go')
@@ -53,7 +59,7 @@ fix-gofumpt:
 		$(go_files)
 
 .PHONY: fix-go-buildfiles
-fix-go-buildfiles:
-	go mod tidy -v
+fix-go-buildfiles: $(go)
+	$(go) mod tidy -v
 	./bazel run //:gazelle_update_repos
 	./bazel run //:gazelle
