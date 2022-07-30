@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "basic",
+    srcs = [
+        "credentials.go",
+        "doc.go",
+        "interceptor.go",
+    ],
+    importpath = "go.saser.se/auth/n/basic",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//auth",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//credentials",
+        "@org_golang_google_grpc//metadata",
+        "@org_golang_google_grpc//status",
+    ],
+)
+
+go_test(
+    name = "basic_test",
+    srcs = [
+        "credentials_test.go",
+        "interceptor_test.go",
+    ],
+    embed = [":basic"],
+    deps = [
+        "//auth",
+        "//grpctest",
+        "//testing/echo",
+        "//testing/echo_go_proto",
+        "@com_github_google_go_cmp//cmp",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)
