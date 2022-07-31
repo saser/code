@@ -8,9 +8,37 @@ import (
 	"net"
 	"testing"
 
+	"go.saser.se/runfiles"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
+
+var (
+	certFile = runfiles.MustPath("grpctest/test_cert.pem")
+	keyFile  = runfiles.MustPath("grpctest/test_key.pem")
+)
+
+// serverCredentials creates server credentials from the pre-initialized
+// certFile and keyFile paths above.
+func serverCredentials(tb testing.TB) credentials.TransportCredentials {
+	tb.Helper()
+	creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
+	if err != nil {
+		tb.Fatalf("failed to create server credentials from testonly TLS certificate and key: %v", err)
+	}
+	return creds
+}
+
+// clientCredentials creates client credentials from the pre-initialized
+// certFile path above.
+func clientCredentials(tb testing.TB) credentials.TransportCredentials {
+	tb.Helper()
+	creds, err := credentials.NewClientTLSFromFile(certFile, "")
+	if err != nil {
+		tb.Fatalf("failed to create client credentials from testonly TLS certificate: %v", err)
+	}
+	return creds
+}
 
 // NewServerAddress starts up a gRPC server, registers the given implementation
 // for the given service description, and returns the address the gRPC server is
@@ -37,7 +65,8 @@ func NewServerAddress(tb testing.TB, sd *grpc.ServiceDesc, impl any) string {
 		}
 	})
 
-	srv := grpc.NewServer()
+	creds := serverCredentials(tb)
+	srv := grpc.NewServer(grpc.Creds(creds))
 	srv.RegisterService(sd, impl)
 	go func() {
 		errc <- srv.Serve(lis)
@@ -55,7 +84,8 @@ func NewClientConn(tb testing.TB, sd *grpc.ServiceDesc, impl any) *grpc.ClientCo
 	tb.Helper()
 
 	addr := NewServerAddress(tb, sd, impl)
-	cc, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	creds := clientCredentials(tb)
+	cc, err := grpc.Dial(addr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		tb.Fatalf("failed to open gRPC connection to %q: %v", addr, err)
 	}

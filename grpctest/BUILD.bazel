@@ -1,13 +1,35 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
+genrule(
+    name = "test_certificate_and_key",
+    outs = [
+        "test_cert.pem",
+        "test_key.pem",
+    ],
+    cmd = " ".join([
+        "$(location //grpctest/generate_certificate)",
+        '--hostnames="localhost"',
+        '--ips="127.0.0.1"',
+        "--seed=1",
+        '--cert_out="$(location test_cert.pem)"',
+        '--key_out="$(location test_key.pem)"',
+    ]),
+    exec_tools = ["//grpctest/generate_certificate"],
+)
+
 go_library(
     name = "grpctest",
     srcs = ["grpctest.go"],
+    data = [
+        "test_cert.pem",
+        "test_key.pem",
+    ],
     importpath = "go.saser.se/grpctest",
     visibility = ["//visibility:public"],
     deps = [
+        "//runfiles",
         "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//credentials/insecure",
+        "@org_golang_google_grpc//credentials",
     ],
 )
 
