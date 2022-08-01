@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "grpctest",
+    srcs = ["grpctest.go"],
+    importpath = "go.saser.se/grpctest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//credentials/insecure",
+    ],
+)
+
+go_test(
+    name = "grpctest_test",
+    srcs = ["grpctest_test.go"],
+    embed = [":grpctest"],
+    deps = [
+        "//testing/echo",
+        "//testing/echo_go_proto",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//credentials/insecure",
+    ],
+)
