@@ -40,5 +40,6 @@ go_test(
     deps = [
         "//testing/echo",
         "//testing/echo_go_proto",
+        "@org_golang_google_grpc//:grpc",
     ],
 )

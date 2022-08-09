@@ -7,6 +7,7 @@ import (
 
 	"go.saser.se/testing/echo"
 	echopb "go.saser.se/testing/echo_go_proto"
+	"google.golang.org/grpc"
 )
 
 // We run these tests with a significant amount of concurrency to try and suss
@@ -31,6 +32,17 @@ func TestNew(t *testing.T) {
 			}
 			if srv.ClientConn == nil {
 				t.Errorf("srv.Conn = %v; want non-nil", srv.ClientConn)
+			}
+
+			// It should be possible to open a new connection to the address.
+			_, err := grpc.DialContext(
+				ctx,
+				srv.Address,
+				grpc.WithBlock(), // We need to block to know that it really works.
+				grpc.WithTransportCredentials(clientCredentials(t)),
+			)
+			if err != nil {
+				t.Errorf("failed to create a new gRPC connection to %q: %v", srv.Address, err)
 			}
 
 			client := echopb.NewEchoClient(srv.ClientConn)
