@@ -4,6 +4,7 @@
 package grpctest
 
 import (
+	"context"
 	"errors"
 	"net"
 	"testing"
@@ -40,52 +41,85 @@ func clientCredentials(tb testing.TB) credentials.TransportCredentials {
 	return creds
 }
 
-// NewServerAddress starts up a gRPC server, registers the given implementation
-// for the given service description, and returns the address the gRPC server is
-// listening on.
-func NewServerAddress(tb testing.TB, sd *grpc.ServiceDesc, impl any) string {
+// Server represents a gRPC server that has been set up by this package.
+type Server struct {
+	// Address is what the server is listening on.
+	Address string
+	// ClientConn is pre-dialed and ready for use.
+	ClientConn *grpc.ClientConn
+}
+
+// Options configures how the server and client connection should be set up.
+//
+// ServiceDesc and Implementation are required fields. All other fields are
+// optional.
+type Options struct {
+	// ServiceDesc is the gRPC service that should be served by the server.
+	ServiceDesc *grpc.ServiceDesc
+	// Implementation must implement ServiceDesc.
+	Implementation any
+}
+
+// New sets up a Server and arranges for all associated resources to be cleaned up when the test ends.
+//
+// The passed in context is only used until New returns. This is enforced by
+// deriving a new context that is cancelled when New returns.
+func New(ctx context.Context, tb testing.TB, opts Options) *Server {
 	tb.Helper()
 
-	// We use a port number of 0 to let the operating system assign us a port.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	if opts.ServiceDesc == nil {
+		tb.Error("servertest: the service description must not be nil")
+	}
+	if opts.Implementation == nil {
+		tb.Error("servertest: the implementation must not be nil")
+	}
+	if tb.Failed() {
+		tb.FailNow()
+	}
+
+	// Only listen on localhost. Using 0 as the port number will make the
+	// operating system allocate a port for us.
 	const listenAddr = "localhost:0"
 	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		tb.Fatalf("failed to create TCP listener for %q: %v", listenAddr, err)
+		tb.Fatalf("failed to create listener on %q: %v", listenAddr, err)
 	}
 	tb.Cleanup(func() {
+		// The listener will be used for the gRPC server we will start up later.
+		// When that server is stopped it will also close the listener, which
+		// results in a net.ErrClosed error. Therefore, we only fail the test if
+		// we get some other error.
 		if err := lis.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			tb.Errorf("failed to close TCP listener for %q: %v", listenAddr, err)
+			tb.Errorf("failed to close listener on %q: %v", listenAddr, err)
 		}
 	})
+
+	srvOpts := []grpc.ServerOption{
+		grpc.Creds(serverCredentials(tb)),
+	}
+	srv := grpc.NewServer(srvOpts...)
+	srv.RegisterService(opts.ServiceDesc, opts.Implementation)
 
 	errc := make(chan error, 1)
 	tb.Cleanup(func() {
 		if err := <-errc; err != nil {
-			tb.Errorf("gRPC server failed to serve: %v", err)
+			tb.Errorf("gRPC server returned an error: %v", err)
 		}
 	})
 
-	creds := serverCredentials(tb)
-	srv := grpc.NewServer(grpc.Creds(creds))
-	srv.RegisterService(sd, impl)
 	go func() {
 		errc <- srv.Serve(lis)
 	}()
 	tb.Cleanup(srv.GracefulStop)
 
-	return lis.Addr().String()
-}
-
-// NewClientConn starts up a gRPC server, with the given implementation
-// registered for the given service description, and returns a gRPC client
-// pointed at that server. NewClientConn does _not_ wait until the client has
-// fully connected before returning.
-func NewClientConn(tb testing.TB, sd *grpc.ServiceDesc, impl any) *grpc.ClientConn {
-	tb.Helper()
-
-	addr := NewServerAddress(tb, sd, impl)
-	creds := clientCredentials(tb)
-	cc, err := grpc.Dial(addr, grpc.WithTransportCredentials(creds))
+	addr := lis.Addr().String()
+	dialOpts := []grpc.DialOption{
+		grpc.WithTransportCredentials(clientCredentials(tb)),
+	}
+	cc, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		tb.Fatalf("failed to open gRPC connection to %q: %v", addr, err)
 	}
@@ -94,5 +128,9 @@ func NewClientConn(tb testing.TB, sd *grpc.ServiceDesc, impl any) *grpc.ClientCo
 			tb.Errorf("failed to close gRPC connection to %q: %v", addr, err)
 		}
 	})
-	return cc
+
+	return &Server{
+		Address:    addr,
+		ClientConn: cc,
+	}
 }
