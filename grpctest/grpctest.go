@@ -58,6 +58,13 @@ type Options struct {
 	ServiceDesc *grpc.ServiceDesc
 	// Implementation must implement ServiceDesc.
 	Implementation any
+
+	// The below fields are all optional.
+
+	// ServerOptions will be used for starting the gRPC server.
+	ServerOptions []grpc.ServerOption
+	// DialOptions will be used when opening the gRPC connection.
+	DialOptions []grpc.DialOption
 }
 
 // New sets up a Server and arranges for all associated resources to be cleaned up when the test ends.
@@ -97,9 +104,13 @@ func New(ctx context.Context, tb testing.TB, opts Options) *Server {
 		}
 	})
 
+	// These are the default server options.
 	srvOpts := []grpc.ServerOption{
 		grpc.Creds(serverCredentials(tb)),
 	}
+	// Any caller-provided options are added afterwards, to possibly override
+	// the default ones.
+	srvOpts = append(srvOpts, opts.ServerOptions...)
 	srv := grpc.NewServer(srvOpts...)
 	srv.RegisterService(opts.ServiceDesc, opts.Implementation)
 
@@ -116,9 +127,13 @@ func New(ctx context.Context, tb testing.TB, opts Options) *Server {
 	tb.Cleanup(srv.GracefulStop)
 
 	addr := lis.Addr().String()
+	// These are the default dial options.
 	dialOpts := []grpc.DialOption{
 		grpc.WithTransportCredentials(clientCredentials(tb)),
 	}
+	// Any caller-provided options are added afterwards, to possibly override
+	// the default ones.
+	dialOpts = append(dialOpts, opts.DialOptions...)
 	cc, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		tb.Fatalf("failed to open gRPC connection to %q: %v", addr, err)
