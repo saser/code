@@ -9,6 +9,7 @@ import (
 const schemaPath = "postgres/postgrestest/schema.sql"
 
 func TestOpen(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	pool := Open(ctx, t, schemaPath)
 	sql := strings.TrimSpace(`

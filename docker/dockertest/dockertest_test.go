@@ -12,6 +12,7 @@ const (
 )
 
 func TestLoad(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	if got, want := Load(ctx, t, helloWorld), "bazel/docker/dockertest:hello_world_image"; got != want {
 		t.Errorf("Load(%q) = %q; want %q", helloWorld, got, want)
@@ -19,6 +20,7 @@ func TestLoad(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	opts := RunOptions{
 		Image: Load(ctx, t, helloWorld),
@@ -32,6 +34,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestAddress(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	opts := RunOptions{
 		Image: Load(ctx, t, postgres),

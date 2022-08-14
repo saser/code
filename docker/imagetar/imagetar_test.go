@@ -58,6 +58,7 @@ func replaceFile(t *testing.T, archive []byte, name string, contents []byte) []b
 }
 
 func TestRepositories(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name string
 		r    io.Reader
@@ -83,7 +84,9 @@ func TestRepositories(t *testing.T) {
 			},
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := Repositories(tt.r)
 			if err != nil {
 				t.Fatal(err)
@@ -96,6 +99,7 @@ func TestRepositories(t *testing.T) {
 }
 
 func TestRepositories_Error(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name string
 		r    io.Reader
@@ -112,7 +116,9 @@ func TestRepositories_Error(t *testing.T) {
 			want: ErrRepositoriesInvalid,
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, got := Repositories(tt.r)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("unexpected error from Repositories (-want +got)\n%s", diff)
@@ -122,6 +128,7 @@ func TestRepositories_Error(t *testing.T) {
 }
 
 func TestImages(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name string
 		r    io.Reader
@@ -143,6 +150,7 @@ func TestImages(t *testing.T) {
 			},
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := Images(tt.r)
 			if err != nil {
@@ -157,6 +165,7 @@ func TestImages(t *testing.T) {
 }
 
 func TestImages_Error(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name string
 		r    io.Reader
@@ -173,7 +182,9 @@ func TestImages_Error(t *testing.T) {
 			want: ErrRepositoriesInvalid,
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, got := Images(tt.r)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("unexpected error from Images (-want +got)\n%s", diff)

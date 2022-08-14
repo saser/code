@@ -13,6 +13,7 @@ const (
 )
 
 func TestPath(t *testing.T) {
+	t.Parallel()
 	path, err := Path(testfile)
 	if err != nil {
 		t.Fatalf("Path(%q) err = %v; want nil", testfile, err)
@@ -25,6 +26,7 @@ func TestPath(t *testing.T) {
 }
 
 func TestPath_Error(t *testing.T) {
+	t.Parallel()
 	got, err := Path(doesNotExist)
 	if err == nil {
 		t.Errorf("Path(%q) err = nil; want non-nil", doesNotExist)
@@ -35,6 +37,7 @@ func TestPath_Error(t *testing.T) {
 }
 
 func TestPathT(t *testing.T) {
+	t.Parallel()
 	path := PathT(t, testfile)
 	// We can't assert much about the path -- it's too "workstation-dependent".
 	// It should _probably_ be an absolute path, though.
@@ -44,6 +47,7 @@ func TestPathT(t *testing.T) {
 }
 
 func TestMustPath(t *testing.T) {
+	t.Parallel()
 	path := MustPath(testfile)
 	// We can't assert much about the path -- it's too "workstation-dependent".
 	// It should _probably_ be an absolute path, though.
@@ -53,6 +57,7 @@ func TestMustPath(t *testing.T) {
 }
 
 func TestMustPath_Panic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if err := recover(); err == nil {
 			t.Errorf("MustPath(%q) either did not panic or panicked with nil argument", doesNotExist)
@@ -62,6 +67,7 @@ func TestMustPath_Panic(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
+	t.Parallel()
 	f, err := Open(testfile)
 	if err != nil {
 		t.Fatalf("Open(%q) err = %v; want nil", testfile, err)
@@ -82,6 +88,7 @@ func TestOpen(t *testing.T) {
 }
 
 func TestOpen_Error(t *testing.T) {
+	t.Parallel()
 	f, err := Open(doesNotExist)
 	if err == nil {
 		t.Errorf("Open(%q) err = nil; want non-nil", doesNotExist)
@@ -92,6 +99,7 @@ func TestOpen_Error(t *testing.T) {
 }
 
 func TestOpenT(t *testing.T) {
+	t.Parallel()
 	f := OpenT(t, testfile)
 	got, err := io.ReadAll(f)
 	if err != nil {
@@ -104,6 +112,7 @@ func TestOpenT(t *testing.T) {
 }
 
 func TestMustOpen(t *testing.T) {
+	t.Parallel()
 	f := MustOpen(testfile)
 	defer func() {
 		if err := f.Close(); err != nil {
@@ -113,6 +122,7 @@ func TestMustOpen(t *testing.T) {
 }
 
 func TestMustOpen_Panic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if err := recover(); err == nil {
 			t.Errorf("MustOpen(%q) either did not panic or panicked with nil argument", doesNotExist)
@@ -122,6 +132,7 @@ func TestMustOpen_Panic(t *testing.T) {
 }
 
 func TestRead(t *testing.T) {
+	t.Parallel()
 	got, err := Read(testfile)
 	if err != nil {
 		t.Fatalf("Read(%q) err = %v; want nil", testfile, err)
@@ -133,6 +144,7 @@ func TestRead(t *testing.T) {
 }
 
 func TestRead_Error(t *testing.T) {
+	t.Parallel()
 	got, err := Read(doesNotExist)
 	if err == nil {
 		t.Errorf("Read(%q) err = nil; want non-nil", doesNotExist)
@@ -143,6 +155,7 @@ func TestRead_Error(t *testing.T) {
 }
 
 func TestReadT(t *testing.T) {
+	t.Parallel()
 	got := ReadT(t, testfile)
 	want := []byte("This is an example file to be used in tests.\n")
 	if !bytes.Equal(got, want) {
@@ -151,6 +164,7 @@ func TestReadT(t *testing.T) {
 }
 
 func TestMustRead(t *testing.T) {
+	t.Parallel()
 	got := MustRead(testfile)
 	want := []byte("This is an example file to be used in tests.\n")
 	if !bytes.Equal(got, want) {
@@ -159,6 +173,7 @@ func TestMustRead(t *testing.T) {
 }
 
 func TestMustRead_Panic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if err := recover(); err == nil {
 			t.Errorf("MustRead(%q) either did not panic or panicked with nil argument", doesNotExist)
