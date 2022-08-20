@@ -37,7 +37,7 @@ func errmain() error {
 	port := *portFlag
 	if port < 0 {
 		envPort := os.Getenv("PORT")
-		glog.Infof("Flag -port=%d is negative; using the environment variable PORT=%q instead", envPort)
+		glog.Infof("Flag -port=%d is negative; using the environment variable PORT=%q instead", port, envPort)
 		var err error
 		port, err = strconv.Atoi(envPort)
 		if err != nil {
