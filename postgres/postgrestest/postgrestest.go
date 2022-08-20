@@ -5,7 +5,7 @@ package postgrestest
 
 import (
 	"context"
-	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -45,7 +45,12 @@ func Open(ctx context.Context, tb testing.TB, schemaPath string) *postgres.Pool 
 	addr := dockertest.Address(ctx, tb, id, "5432/tcp")
 
 	// Connect to the container.
-	connString := fmt.Sprintf("postgres://%s:%s@%s/%s", user, password, addr, dbName)
+	connString := (&url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(user, password),
+		Host:   addr,
+		Path:   dbName,
+	}).String()
 	pool, err := postgres.Open(ctx, connString)
 	if err != nil {
 		tb.Fatal(err)
