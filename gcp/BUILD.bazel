@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "gcp_test",
+    srcs = ["gcp_test.go"],
+    data = [
+        "constants.bzl",
+        "constants.bzl.template",
+    ],
+    deps = [
+        "//runfiles",
+        "@com_github_golang_glog//:glog",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+    ],
+)
