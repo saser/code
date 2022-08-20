@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "generate_config_lib",
+    srcs = ["generate_config.go"],
+    embedsrcs = ["config.json.template"],
+    importpath = "go.saser.se/docker/config/generate_config",
+    visibility = ["//visibility:private"],
+    deps = ["@com_github_golang_glog//:glog"],
+)
+
+go_binary(
+    name = "generate_config",
+    embed = [":generate_config_lib"],
+    visibility = ["//visibility:public"],
+)

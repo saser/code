@@ -31,3 +31,12 @@ $ make generate                  # regenerate code
 $ make fix                       # update repositories.bzl, BUILD files, etc
 $ make fix                       # possibly needed due to non-hermetic code formatters
 ```
+
+## Regenerate `config.json` for Docker
+
+```shell
+$ ./bazel build //docker/config:generated_config.json
+$ cp \
+    bazel-bin/docker/config/generated_config.json \
+    docker/config/config.json
+```
