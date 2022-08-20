@@ -1,5 +1,6 @@
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("//gcp:container.bzl", "gcp_docker_push")
 
 go_library(
     name = "server_lib",
@@ -25,4 +26,11 @@ go_binary(
 go_image(
     name = "server_image",
     binary = ":server",
+)
+
+gcp_docker_push(
+    name = "push_server_image_as_latest",
+    image = ":server_image",
+    repository = "tasks/server/server_image",
+    tag = "latest",
 )
