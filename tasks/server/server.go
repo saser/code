@@ -19,6 +19,9 @@ import (
 	"go.saser.se/tasks/service"
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc"
+
+	// Imported for side-effects.
+	_ "google.golang.org/grpc/grpclog/glogger"
 )
 
 var (
