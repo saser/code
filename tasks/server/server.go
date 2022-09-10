@@ -19,6 +19,8 @@ import (
 	"go.saser.se/tasks/service"
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	// Imported for side-effects.
 	_ "google.golang.org/grpc/grpclog/glogger"
@@ -29,6 +31,8 @@ var (
 	postgresConnString = flag.String("postgres_conn_string", "", "Connection string to backing Postgres database.")
 	username           = flag.String("username", "", "Username to be used for basic authentication.")
 	password           = flag.String("password", "", "Password to be used for basic authentication.")
+	certFile           = flag.String("cert_file", "", "Path to TLS certificate. If empty then no transport security will be used. If this flag is set then -key_file must also be set.")
+	keyFile            = flag.String("key_file", "", "Path to TLS certificate private key. If empty then no transport security will be used. If this flag is set then -cert_file must also be set.")
 )
 
 func errmain() error {
@@ -48,12 +52,32 @@ func errmain() error {
 		}
 	}
 	glog.Infof("Will listen on port %d.", port)
+
 	if *postgresConnString == "" {
 		return errors.New("-postgres_conn_string is empty")
 	}
 	glog.Infof("Will connect to Postgres with connection string: %q", *postgresConnString)
+
 	if *username == "" || *password == "" {
 		return fmt.Errorf("-username=%q and -password=%q; both must be non-empty", *username, *password)
+	}
+
+	hasCert := *certFile != ""
+	hasKey := *keyFile != ""
+	if hasCert != hasKey {
+		return fmt.Errorf("-cert_file=%q and -key_file=%q; cannot set only one of them", *certFile, *keyFile)
+	}
+	var transportCreds credentials.TransportCredentials
+	if !hasCert {
+		glog.Infof("No certificate was given in -cert_file and -key_file; will serve WITHOUT transport security.")
+		transportCreds = insecure.NewCredentials()
+	} else {
+		creds, err := credentials.NewServerTLSFromFile(*certFile, *keyFile)
+		if err != nil {
+			return fmt.Errorf("-cert_file=%q and -key_file=%q is invalid: %w", *certFile, *keyFile, err)
+		}
+		glog.Infof("Will serve WITH transport security loaded from -cert_file=%q and -key_file=%q", *certFile, *keyFile)
+		transportCreds = creds
 	}
 
 	listenAddr := ":" + strconv.Itoa(port)
@@ -83,8 +107,12 @@ func errmain() error {
 	if err != nil {
 		return fmt.Errorf("failed to create basic authentication interceptor: %w", err)
 	}
-	srv := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
-	srv.RegisterService(&pb.Tasks_ServiceDesc, service.New(pool))
+
+	srv := grpc.NewServer(
+		grpc.Creds(transportCreds),
+		grpc.UnaryInterceptor(interceptor),
+	)
+	pb.RegisterTasksServer(srv, service.New(pool))
 
 	errc := make(chan error, 1)
 	go func() {
