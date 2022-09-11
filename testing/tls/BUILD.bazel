@@ -1,0 +1,17 @@
+genrule(
+    name = "test_certificate_and_key",
+    outs = [
+        "test_cert.pem",
+        "test_key.pem",
+    ],
+    cmd = " ".join([
+        "$(location //testing/tls/generate_certificate)",
+        '--hostnames="localhost"',
+        '--ips="127.0.0.1"',
+        "--seed=1",
+        '--cert_out="$(location test_cert.pem)"',
+        '--key_out="$(location test_key.pem)"',
+    ]),
+    exec_tools = ["//testing/tls/generate_certificate"],
+    visibility = ["//visibility:public"],
+)

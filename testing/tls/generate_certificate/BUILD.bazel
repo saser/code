@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "generate_certificate_lib",
     srcs = ["generate_certificate.go"],
-    importpath = "go.saser.se/grpctest/generate_certificate",
+    importpath = "go.saser.se/testing/tls/generate_certificate",
     visibility = ["//visibility:private"],
     deps = ["@com_github_golang_glog//:glog"],
 )

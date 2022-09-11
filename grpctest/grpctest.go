@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	certFile = runfiles.MustPath("grpctest/test_cert.pem")
-	keyFile  = runfiles.MustPath("grpctest/test_key.pem")
+	certFile = runfiles.MustPath("testing/tls/test_cert.pem")
+	keyFile  = runfiles.MustPath("testing/tls/test_key.pem")
 )
 
 // serverCredentials creates server credentials from the pre-initialized
