@@ -12,7 +12,7 @@ import (
 
 // We run these tests with a significant amount of concurrency to try and suss
 // out races w.r.t. picking ports and establishing connections.
-const concurrency = 100_000
+const concurrency = 10_000
 
 func TestNew(t *testing.T) {
 	t.Parallel()
