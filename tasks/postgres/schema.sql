@@ -10,7 +10,7 @@ CREATE TABLE tasks (
     create_time TIMESTAMP WITH TIME ZONE NOT NULL,
     update_time TIMESTAMP WITH TIME ZONE, -- If non-null, then task has been updated at least once.
     delete_time TIMESTAMP WITH TIME ZONE, -- If non-null, then task is considered deleted.
-    expiry_time TIMESTAMP WITH TIME ZONE,
+    expire_time TIMESTAMP WITH TIME ZONE,
 
     PRIMARY KEY (id),
     CONSTRAINT parent_references_id FOREIGN KEY (parent) REFERENCES tasks (id),
@@ -18,8 +18,8 @@ CREATE TABLE tasks (
     CONSTRAINT create_time_not_after_complete_time CHECK (complete_time IS NULL OR create_time <= complete_time),
     CONSTRAINT create_time_not_after_delete_time CHECK (delete_time IS NULL OR create_time <= delete_time),
     CONSTRAINT create_time_not_after_update_time CHECK (update_time IS NULL OR create_time <= update_time),
-    CONSTRAINT delete_time_iff_expiry_time CHECK ((delete_time IS NULL) = (expiry_time IS NULL)),
-    CONSTRAINT delete_time_not_after_expiry_time CHECK (delete_time IS NULL OR delete_time <= expiry_time)
+    CONSTRAINT delete_time_iff_expire_time CHECK ((delete_time IS NULL) = (expire_time IS NULL)),
+    CONSTRAINT delete_time_not_after_expire_time CHECK (delete_time IS NULL OR delete_time <= expire_time)
 );
 
 -- A table of page tokens. The rows in this table define the set of acceptable

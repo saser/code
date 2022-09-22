@@ -130,7 +130,7 @@ func (s *Suite) TestGetTask_AfterDeletion() {
 	}
 
 	// After the task has expired we shouldn't be able to get it anymore.
-	s.clock.Advance(task.GetExpiryTime().AsTime().Sub(s.clock.Now()))
+	s.clock.Advance(task.GetExpireTime().AsTime().Sub(s.clock.Now()))
 	s.clock.Advance(1 * time.Minute)
 	req := &pb.GetTaskRequest{
 		Name: task.GetName(),
@@ -446,9 +446,9 @@ func (s *Suite) TestListTasks_WithDeletions_ShowDeleted() {
 
 	// After the soft deleted task has expired it should no longer show up in
 	// ListTasks.
-	s.clock.Advance(want[1].GetExpiryTime().AsTime().Sub(s.clock.Now()))
+	s.clock.Advance(want[1].GetExpireTime().AsTime().Sub(s.clock.Now()))
 	s.clock.Advance(1 * time.Minute)
-	wantAfterExpiry := []*pb.Task{
+	wantAfterExpiration := []*pb.Task{
 		want[0],
 		want[2],
 	}
@@ -456,7 +456,7 @@ func (s *Suite) TestListTasks_WithDeletions_ShowDeleted() {
 		PageSize:    int32(len(want)),
 		ShowDeleted: true,
 	})
-	if diff := cmp.Diff(wantAfterExpiry, got, protocmp.Transform(), cmpopts.SortSlices(taskLessFunc)); diff != "" {
+	if diff := cmp.Diff(wantAfterExpiration, got, protocmp.Transform(), cmpopts.SortSlices(taskLessFunc)); diff != "" {
 		t.Errorf("after expiration: unexpected result of ListTasks with show_deleted = true (-want +got)\n%s", diff)
 	}
 }
@@ -1314,10 +1314,10 @@ func (s *Suite) TestDeleteTask() {
 		if err := deleted.GetDeleteTime().CheckValid(); err != nil {
 			t.Errorf("first deletion: delete_time is invalid: %v", err)
 		}
-		if err := deleted.GetExpiryTime().CheckValid(); err != nil {
+		if err := deleted.GetExpireTime().CheckValid(); err != nil {
 			t.Errorf("first deletion: expiry_time is invalid: %v", err)
 		}
-		if delete, expiry := deleted.GetDeleteTime().AsTime(), deleted.GetExpiryTime().AsTime(); expiry.Before(delete) {
+		if delete, expiry := deleted.GetDeleteTime().AsTime(), deleted.GetExpireTime().AsTime(); expiry.Before(delete) {
 			t.Errorf("first deletion: delete_time = %v; wanted before expiry_time = %v", delete, expiry)
 		}
 	}

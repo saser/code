@@ -70,7 +70,7 @@ message Task {
     google.protobuf.Timestamp delete_time = 9;
 
     // When the task will be permanently deleted after being soft deleted.
-    google.protobuf.Timestamp expiry_time = 10;
+    google.protobuf.Timestamp expire_time = 10;
 }
 
 message GetTaskRequest {

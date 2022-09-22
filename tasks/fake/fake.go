@@ -152,7 +152,7 @@ func (f *Fake) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task, e
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	task := f.tasks[idx]
-	if expiry := task.GetExpiryTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
+	if expire := task.GetExpireTime(); expire.IsValid() && f.now().After(expire.AsTime()) {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	return proto.Clone(task).(*pb.Task), nil
@@ -187,7 +187,7 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 	res := &pb.ListTasksResponse{}
 	for idx := minIndex; idx < len(f.tasks) && len(res.GetTasks()) <= int(pageSize); idx++ {
 		task := f.tasks[idx]
-		if expiry := task.GetExpiryTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
+		if expiry := task.GetExpireTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
 			continue
 		}
 		if task.GetDeleteTime().IsValid() && !req.GetShowDeleted() {
@@ -354,7 +354,7 @@ func (f *Fake) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*pb.T
 			continue
 		}
 		deleted.DeleteTime = timestamppb.New(now)
-		deleted.ExpiryTime = timestamppb.New(now.AddDate(0 /*years*/, 0 /*months*/, 30 /*days*/))
+		deleted.ExpireTime = timestamppb.New(now.AddDate(0 /*years*/, 0 /*months*/, 30 /*days*/))
 	}
 	return proto.Clone(root).(*pb.Task), nil
 }
@@ -394,7 +394,7 @@ func (f *Fake) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest) (*
 	for _, i := range toUndeleteIndices {
 		task := f.tasks[i]
 		task.DeleteTime = nil
-		task.ExpiryTime = nil
+		task.ExpireTime = nil
 	}
 	return proto.Clone(f.tasks[idx]).(*pb.Task), nil
 }

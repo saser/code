@@ -104,7 +104,7 @@ func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task
 		glog.Error(err)
 		return nil, internalError
 	}
-	if expiry := task.GetExpiryTime(); expiry.IsValid() && now.After(expiry.AsTime()) {
+	if expire := task.GetExpireTime(); expire.IsValid() && now.After(expire.AsTime()) {
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	return task, nil
@@ -177,7 +177,7 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 			description                        string
 			completeTime                       pgtype.Timestamptz
 			createTime                         time.Time
-			updateTime, deleteTime, expiryTime pgtype.Timestamptz
+			updateTime, deleteTime, expireTime pgtype.Timestamptz
 			// To use for the next page, if any.
 			nextMinID int64
 		)
@@ -190,7 +190,7 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 				"create_time",
 				"update_time",
 				"delete_time",
-				"expiry_time",
+				"expire_time",
 			).
 			From("tasks").
 			Where(squirrel.GtOrEq{
@@ -203,10 +203,10 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 		} else {
 			st = st.Where(squirrel.Or{
 				squirrel.Eq{
-					"expiry_time": nil,
+					"expire_time": nil,
 				},
 				squirrel.Gt{
-					"expiry_time": now,
+					"expire_time": now,
 				},
 			})
 		}
@@ -239,8 +239,8 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 			if deleteTime.Status == pgtype.Present {
 				task.DeleteTime = timestamppb.New(deleteTime.Time)
 			}
-			if expiryTime.Status == pgtype.Present {
-				task.ExpiryTime = timestamppb.New(expiryTime.Time)
+			if expireTime.Status == pgtype.Present {
+				task.ExpireTime = timestamppb.New(expireTime.Time)
 			}
 			tasks = append(tasks, task)
 			return nil
@@ -256,7 +256,7 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 				&createTime,
 				&updateTime,
 				&deleteTime,
-				&expiryTime,
+				&expireTime,
 			},
 			qf,
 		); err != nil {
@@ -550,19 +550,19 @@ func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*p
 		descIDs = append(descIDs, id)
 		// Now we are ready to make updates.
 
-		// We "delete" tasks by setting their `delete_time` and `expiry_time`
+		// We "delete" tasks by setting their `delete_time` and `expire_time`
 		// fields. `delete_time` should be set to the current time, and
-		// `expiry_time` is arbitrarily chosen to be some point in the future.
+		// `expire_time` is arbitrarily chosen to be some point in the future.
 		deleteTime, err := s.now(ctx, tx)
 		if err != nil {
 			return err
 		}
-		expiryTime := deleteTime.AddDate(0 /* years */, 0 /* months */, 30 /* days */)
+		expireTime := deleteTime.AddDate(0 /* years */, 0 /* months */, 30 /* days */)
 
 		// These new timestamps should be reflected in the returned version of
 		// the task.
 		deleted.DeleteTime = timestamppb.New(deleteTime)
-		deleted.ExpiryTime = timestamppb.New(expiryTime)
+		deleted.ExpireTime = timestamppb.New(expireTime)
 
 		// Below is the actual update in the database. We only update and don't
 		// return anything back, because we have already fetched everything
@@ -571,7 +571,7 @@ func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*p
 			Update("tasks").
 			SetMap(map[string]interface{}{
 				"delete_time": deleteTime,
-				"expiry_time": expiryTime,
+				"expire_time": expireTime,
 			}).
 			Where(squirrel.Eq{
 				"id": descIDs,
@@ -628,7 +628,7 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 		if !task.GetDeleteTime().IsValid() {
 			return errNotDeleted
 		}
-		if now.After(task.GetExpiryTime().AsTime()) {
+		if now.After(task.GetExpireTime().AsTime()) {
 			return errExpired
 		}
 
@@ -671,7 +671,7 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 			Update("tasks").
 			SetMap(map[string]interface{}{
 				"delete_time": nil,
-				"expiry_time": nil,
+				"expire_time": nil,
 			}).
 			Where(squirrel.Eq{
 				"id": toUndeleteIDs,
@@ -696,7 +696,7 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 		return nil, internalError
 	}
 	task.DeleteTime = nil
-	task.ExpiryTime = nil
+	task.ExpireTime = nil
 	return task, nil
 }
 
@@ -958,7 +958,7 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 	var parent *int64
 	var completeTime pgtype.Timestamptz
 	var createTime time.Time
-	var deleteTime, expiryTime, updateTime pgtype.Timestamptz
+	var deleteTime, expireTime, updateTime pgtype.Timestamptz
 	st := postgres.StatementBuilder.
 		Select(
 			"parent",
@@ -968,7 +968,7 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 			"create_time",
 			"update_time",
 			"delete_time",
-			"expiry_time",
+			"expire_time",
 		)
 
 	from := "existing_tasks"
@@ -992,7 +992,7 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 		&createTime,
 		&updateTime,
 		&deleteTime,
-		&expiryTime,
+		&expireTime,
 	); err != nil {
 		return nil, err
 	}
@@ -1007,8 +1007,8 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 	if deleteTime.Status == pgtype.Present {
 		task.DeleteTime = timestamppb.New(deleteTime.Time)
 	}
-	if expiryTime.Status == pgtype.Present {
-		task.ExpiryTime = timestamppb.New(expiryTime.Time)
+	if expireTime.Status == pgtype.Present {
+		task.ExpireTime = timestamppb.New(expireTime.Time)
 	}
 	if updateTime.Status == pgtype.Present {
 		task.UpdateTime = timestamppb.New(updateTime.Time)
