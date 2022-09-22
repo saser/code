@@ -25,7 +25,7 @@ var (
 // structed as follows to match the definition of the "repositories" file as
 // described at https://docs.docker.com/engine/api/v1.41/#operation/ImageGet.
 //
-//     repository -> tag -> layer ID
+//	repository -> tag -> layer ID
 //
 // If no "repositories" file is found, Repositories returns
 // ErrRepositoriesNotFound. If the file is found but its contents cannot be
