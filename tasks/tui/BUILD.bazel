@@ -5,7 +5,11 @@ go_library(
     srcs = ["main.go"],
     importpath = "go.saser.se/tasks/tui",
     visibility = ["//visibility:private"],
-    deps = ["@io_k8s_klog_v2//:klog"],
+    deps = [
+        "//tasks/tui/root",
+        "@com_github_charmbracelet_bubbletea//:bubbletea",
+        "@io_k8s_klog_v2//:klog",
+    ],
 )
 
 go_binary(

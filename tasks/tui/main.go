@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"go.saser.se/tasks/tui/root"
 	"k8s.io/klog/v2"
 )
 
@@ -12,7 +13,9 @@ func init() {
 }
 
 func errmain() error {
-	fmt.Println("Hello, world!")
+	if err := tea.NewProgram(root.New(), tea.WithAltScreen()).Start(); err != nil {
+		return err
+	}
 	return nil
 }
 

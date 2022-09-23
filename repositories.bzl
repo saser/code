@@ -74,6 +74,12 @@ def go_repositories():
         sum = "h1:6MnRN8NT7+YBpUIWxHtefFZOKTAPgGjpQSxqLNn0+qY=",
         version = "v2.1.1",
     )
+    go_repository(
+        name = "com_github_charmbracelet_bubbletea",
+        importpath = "github.com/charmbracelet/bubbletea",
+        sum = "h1:z66q0LWdJNOWEH9zadiAIXp2GN1AWrwNXU8obVY9X24=",
+        version = "v0.22.1",
+    )
 
     go_repository(
         name = "com_github_chzyer_logex",
@@ -117,6 +123,12 @@ def go_repositories():
         importpath = "github.com/cockroachdb/apd",
         sum = "h1:3LFP3629v+1aKXU5Q37mxmRxX/pIu1nijXydLShEq5I=",
         version = "v1.1.0",
+    )
+    go_repository(
+        name = "com_github_containerd_console",
+        importpath = "github.com/containerd/console",
+        sum = "h1:lIr7SlA5PxZyMV30bDW0MGbiOPXwc63yRuCP0ARubLw=",
+        version = "v1.0.3",
     )
 
     go_repository(
@@ -442,6 +454,12 @@ def go_repositories():
         sum = "h1:AqzbZs4ZoCBp+GtejcpCpcxM3zlSMx29dXbUSeVtJb8=",
         version = "v1.10.2",
     )
+    go_repository(
+        name = "com_github_lucasb_eyer_go_colorful",
+        importpath = "github.com/lucasb-eyer/go-colorful",
+        sum = "h1:1nnpGOrhyZZuNyfu1QjKiUICQ74+3FNCN69Aj6K7nkY=",
+        version = "v1.2.0",
+    )
 
     go_repository(
         name = "com_github_masterminds_semver_v3",
@@ -465,8 +483,20 @@ def go_repositories():
     go_repository(
         name = "com_github_mattn_go_isatty",
         importpath = "github.com/mattn/go-isatty",
-        sum = "h1:wuysRhFDzyxgEmMf5xjvJ2M9dZoWAXNNr5LSBS7uHXY=",
-        version = "v0.0.12",
+        sum = "h1:bq3VjFmv/sOjHtdEhmkEV4x1AJtvUvOJ2PFAZ5+peKQ=",
+        version = "v0.0.16",
+    )
+    go_repository(
+        name = "com_github_mattn_go_localereader",
+        importpath = "github.com/mattn/go-localereader",
+        sum = "h1:ygSAOl7ZXTx4RdPYinUpg6W99U8jWvWi9Ye2JC/oIi4=",
+        version = "v0.0.1",
+    )
+    go_repository(
+        name = "com_github_mattn_go_runewidth",
+        importpath = "github.com/mattn/go-runewidth",
+        sum = "h1:lTGmDsbAYt5DmK6OnoV7EuIF1wEIFAcxld6ypU4OSgU=",
+        version = "v0.0.13",
     )
 
     go_repository(
@@ -496,6 +526,31 @@ def go_repositories():
         sum = "h1:nP9CBfwrvYnBRgY6qfDQkygYDmYwOilePFkwzv4dU8A=",
         version = "v1.0.0",
     )
+    go_repository(
+        name = "com_github_muesli_ansi",
+        importpath = "github.com/muesli/ansi",
+        sum = "h1:1XF24mVaiu7u+CFywTdcDo2ie1pzzhwjt6RHqzpMU34=",
+        version = "v0.0.0-20211018074035-2e021307bc4b",
+    )
+    go_repository(
+        name = "com_github_muesli_cancelreader",
+        importpath = "github.com/muesli/cancelreader",
+        sum = "h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELUXHmA=",
+        version = "v0.2.2",
+    )
+    go_repository(
+        name = "com_github_muesli_reflow",
+        importpath = "github.com/muesli/reflow",
+        sum = "h1:IFsN6K9NfGtjeggFP+68I4chLZV2yIKsXJFNZ+eWh6s=",
+        version = "v0.3.0",
+    )
+    go_repository(
+        name = "com_github_muesli_termenv",
+        importpath = "github.com/muesli/termenv",
+        sum = "h1:QANkGiGr39l1EESqrE0gZw0/AJNYzIvoGLhIoVYtluI=",
+        version = "v0.11.1-0.20220212125758-44cd13922739",
+    )
+
     go_repository(
         name = "com_github_niemeyer_pretty",
         importpath = "github.com/niemeyer/pretty",
@@ -541,6 +596,12 @@ def go_repositories():
         importpath = "github.com/prometheus/client_model",
         sum = "h1:gQz4mCbXsO+nc9n1hCxHcGA3Zx3Eo+UHZoInFGUIXNM=",
         version = "v0.0.0-20190812154241-14fe0d1b01d4",
+    )
+    go_repository(
+        name = "com_github_rivo_uniseg",
+        importpath = "github.com/rivo/uniseg",
+        sum = "h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=",
+        version = "v0.2.0",
     )
 
     go_repository(
@@ -765,8 +826,8 @@ def go_repositories():
     go_repository(
         name = "org_golang_x_sys",
         importpath = "golang.org/x/sys",
-        sum = "h1:PgOr27OhUx2IRqGJ2RxAWI4dJQ7bi9cSrB82uzFzfUA=",
-        version = "v0.0.0-20220614162138-6c1b26c55098",
+        sum = "h1:2QkjZIsXupsJbJIdSjjUOgWK3aEtzyuh2mPt3l/CkeU=",
+        version = "v0.0.0-20220811171246-fbc7d0a398ab",
     )
     go_repository(
         name = "org_golang_x_term",
