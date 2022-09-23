@@ -1,14 +1,14 @@
-// Package glogadapter contains an implementation of the pgx.Logger interface
+// Package klogadapter contains an implementation of the pgx.Logger interface
 // for the glog package.
-package glogadapter
+package klogadapter
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/jackc/pgx/v4"
+	"k8s.io/klog/v2"
 )
 
 // Logger implements pgx.Logger.
@@ -38,14 +38,14 @@ func (l *Logger) Log(ctx context.Context, level pgx.LogLevel, msg string, data m
 	s := sb.String()
 	switch level {
 	case pgx.LogLevelTrace, pgx.LogLevelDebug:
-		glog.InfoDepth(2, "("+level.String()+") "+s)
+		klog.InfoDepth(2, "("+level.String()+") "+s)
 	case pgx.LogLevelInfo:
-		glog.InfoDepth(2, s)
+		klog.InfoDepth(2, s)
 	case pgx.LogLevelWarn:
-		glog.WarningDepth(2, s)
+		klog.WarningDepth(2, s)
 	case pgx.LogLevelError:
-		glog.ErrorDepth(2, s)
+		klog.ErrorDepth(2, s)
 	default:
-		glog.ErrorDepth(2, "("+level.String()+") "+s)
+		klog.ErrorDepth(2, "("+level.String()+") "+s)
 	}
 }

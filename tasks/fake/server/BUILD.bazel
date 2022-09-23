@@ -7,11 +7,11 @@ go_library(
     importpath = "go.saser.se/tasks/fake/server",
     visibility = ["//visibility:private"],
     deps = [
+        "//grpclog/klogger",
         "//tasks/fake",
         "//tasks/tasks_go_proto",
-        "@com_github_golang_glog//:glog",
+        "@io_k8s_klog_v2//:klog",
         "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//grpclog/glogger",
         "@org_golang_google_grpc//reflection",
     ],
 )

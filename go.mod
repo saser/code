@@ -10,7 +10,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/golang/glog v1.0.0
 	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgconn v1.12.1
@@ -22,6 +21,7 @@ require (
 	google.golang.org/grpc v1.47.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.28.0
+	k8s.io/klog/v2 v2.80.1
 	mvdan.cc/gofumpt v0.3.1
 )
 
@@ -30,6 +30,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.4.0 // indirect
+	github.com/go-logr/logr v1.2.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/go-version v1.5.0 // indirect

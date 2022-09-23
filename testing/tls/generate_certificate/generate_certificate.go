@@ -36,8 +36,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
+
+func init() {
+	klog.InitFlags(flag.CommandLine)
+}
 
 const dateLayout = "2006-01-02"
 
@@ -146,6 +150,6 @@ func errmain() error {
 func main() {
 	flag.Parse()
 	if err := errmain(); err != nil {
-		glog.Exit(err)
+		klog.Exit(err)
 	}
 }

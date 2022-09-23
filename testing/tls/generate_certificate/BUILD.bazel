@@ -5,7 +5,7 @@ go_library(
     srcs = ["generate_certificate.go"],
     importpath = "go.saser.se/testing/tls/generate_certificate",
     visibility = ["//visibility:private"],
-    deps = ["@com_github_golang_glog//:glog"],
+    deps = ["@io_k8s_klog_v2//:klog"],
 )
 
 go_binary(

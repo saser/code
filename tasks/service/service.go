@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
@@ -23,6 +22,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"k8s.io/klog/v2"
 )
 
 // maxPageSize is the maximum number of tasks the server will return on a call
@@ -45,7 +45,7 @@ func init() {
 		"description",
 	)
 	if err != nil {
-		glog.Exit(err)
+		klog.Exit(err)
 	}
 	updatableMask = m
 }
@@ -101,7 +101,7 @@ func (s *Service) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 		}
-		glog.Error(err)
+		klog.Error(err)
 		return nil, internalError
 	}
 	if expire := task.GetExpireTime(); expire.IsValid() && now.After(expire.AsTime()) {
@@ -294,7 +294,7 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 		if errors.Is(err, errNoToken) || errors.Is(err, errChangedRequest) {
 			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
 		}
-		glog.Error(err)
+		klog.Error(err)
 		return nil, internalError
 	}
 	return res, nil
@@ -369,7 +369,7 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 		if errors.Is(err, errParentNotFound) {
 			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
 		}
-		glog.Error(err)
+		klog.Error(err)
 		return nil, internalError
 	}
 	return task, nil
@@ -497,7 +497,7 @@ func (s *Service) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*p
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", patch.GetName())
 		}
-		glog.Error(err)
+		klog.Error(err)
 		return nil, internalError
 	}
 
@@ -590,7 +590,7 @@ func (s *Service) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*p
 		if errors.Is(err, errForceRequired) {
 			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has children; not deleting without `force: true`.", name)
 		}
-		glog.Error(err)
+		klog.Error(err)
 		return nil, internalError
 	}
 	return deleted, nil
@@ -692,7 +692,7 @@ func (s *Service) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest)
 		if errors.Is(err, errUndeleteAncestorsRequired) {
 			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has deleted ancestors but `undelete_ancestors` was not set to `true`.", name)
 		}
-		glog.Error(err)
+		klog.Error(err)
 		return nil, internalError
 	}
 	task.DeleteTime = nil
@@ -779,7 +779,7 @@ func (s *Service) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest)
 		if errors.Is(err, errForceRequired) {
 			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has uncompleted children but `force` was not set to true.", name)
 		}
-		glog.Error(err)
+		klog.Error(err)
 		return nil, internalError
 	}
 	return task, nil
@@ -873,7 +873,7 @@ func (s *Service) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequ
 		if errors.Is(err, errUncompleteAncestorsRequired) {
 			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has completed ancestors but `uncomplete_ancestors` was not set to true.", name)
 		}
-		glog.Error(err)
+		klog.Error(err)
 		return nil, internalError
 	}
 	return task, nil

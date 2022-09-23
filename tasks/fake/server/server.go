@@ -9,15 +9,19 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/golang/glog"
 	"go.saser.se/tasks/fake"
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"k8s.io/klog/v2"
 
 	// Imported for side-effects.
-	_ "google.golang.org/grpc/grpclog/glogger"
+	_ "go.saser.se/grpclog/klogger"
 )
+
+func init() {
+	klog.InitFlags(flag.CommandLine)
+}
 
 var port = flag.Int("port", 8080, "The port to serve the gRPC service on.")
 
@@ -28,15 +32,15 @@ func errMain() error {
 	defer stop()
 
 	addr := fmt.Sprintf(":%d", *port)
-	glog.Infof("Will open listener on address %q.", addr)
+	klog.Infof("Will open listener on address %q.", addr)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	glog.Infof("Listening on %q.", addr)
+	klog.Infof("Listening on %q.", addr)
 	defer func() {
 		if err := lis.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			glog.Errorf("Closing listener failed: %v", err)
+			klog.Errorf("Closing listener failed: %v", err)
 		}
 	}()
 
@@ -47,15 +51,15 @@ func errMain() error {
 
 	errc := make(chan error, 1)
 	go func() {
-		glog.Infof("Serving gRPC server on %v.", lis.Addr())
+		klog.Infof("Serving gRPC server on %v.", lis.Addr())
 		errc <- srv.Serve(lis)
 	}()
 
-	glog.Info("Waiting for context to be canceled.")
+	klog.Info("Waiting for context to be canceled.")
 	<-ctx.Done()
-	glog.Info("Context cancelled, stopping gRPC server...")
+	klog.Info("Context cancelled, stopping gRPC server...")
 	srv.GracefulStop()
-	glog.Info("gRPC server stopped.")
+	klog.Info("gRPC server stopped.")
 	if err := <-errc; err != nil {
 		return err
 	}
@@ -66,6 +70,6 @@ func errMain() error {
 func main() {
 	fmt.Println("hello, world")
 	if err := errMain(); err != nil {
-		glog.Exit(err)
+		klog.Exit(err)
 	}
 }

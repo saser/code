@@ -1,15 +1,20 @@
 package gcp
 
 import (
+	"flag"
 	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/golang/glog"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"go.saser.se/runfiles"
+	"k8s.io/klog/v2"
 )
+
+func init() {
+	klog.InitFlags(flag.CommandLine)
+}
 
 // constantDeclaration represents a "CONSTANT = <value>" declaration in
 // Starlark.
@@ -38,7 +43,7 @@ func parseConstants(bzl string) (map[string]constantDeclaration, error) {
 		// If the first character (after trimming spaces) is a '#' or a '"', we
 		// assume it's either a comment or a docstring so we skip it.
 		if c := line[0]; c == '#' || c == '"' {
-			glog.V(1).Infof("Assuming line %d is a comment: %q", lineNumber, line)
+			klog.V(1).Infof("Assuming line %d is a comment: %q", lineNumber, line)
 			continue
 		}
 		// We assume the line looks like this:

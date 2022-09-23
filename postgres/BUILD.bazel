@@ -13,7 +13,7 @@ go_library(
     importpath = "go.saser.se/postgres",
     visibility = ["//visibility:public"],
     deps = [
-        "//postgres/log/glogadapter",
+        "//postgres/log/klogadapter",
         "@com_github_jackc_pgx_v4//pgxpool",
         "@com_github_masterminds_squirrel//:squirrel",
     ],

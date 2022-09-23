@@ -9,7 +9,7 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"go.saser.se/postgres/log/glogadapter"
+	"go.saser.se/postgres/log/klogadapter"
 )
 
 const retryInterval = 1 * time.Second
@@ -29,7 +29,7 @@ func Open(ctx context.Context, connString string) (*Pool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("postgres: open: %w", err)
 	}
-	cfg.ConnConfig.Logger = glogadapter.NewLogger()
+	cfg.ConnConfig.Logger = klogadapter.NewLogger()
 	pool, err := openConfigWithRetry(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: open: %w", err)

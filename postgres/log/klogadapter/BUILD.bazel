@@ -1,12 +1,12 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
-    name = "glogadapter",
-    srcs = ["glogadapter.go"],
-    importpath = "go.saser.se/postgres/log/glogadapter",
+    name = "klogadapter",
+    srcs = ["klogadapter.go"],
+    importpath = "go.saser.se/postgres/log/klogadapter",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_golang_glog//:glog",
         "@com_github_jackc_pgx_v4//:pgx",
+        "@io_k8s_klog_v2//:klog",
     ],
 )

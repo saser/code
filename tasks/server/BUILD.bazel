@@ -9,14 +9,14 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//auth/n/basic",
+        "//grpclog/klogger",
         "//postgres",
         "//tasks/service",
         "//tasks/tasks_go_proto",
-        "@com_github_golang_glog//:glog",
+        "@io_k8s_klog_v2//:klog",
         "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//credentials",
         "@org_golang_google_grpc//credentials/insecure",
-        "@org_golang_google_grpc//grpclog/glogger",
     ],
 )
 

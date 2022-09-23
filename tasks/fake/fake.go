@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
 	pb "go.saser.se/tasks/tasks_go_proto"
@@ -19,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"k8s.io/klog/v2"
 )
 
 // maxPageSize is the maximum number of tasks the server will return on a call
@@ -41,7 +41,7 @@ func init() {
 		"description",
 	)
 	if err != nil {
-		glog.Exit(err)
+		klog.Exit(err)
 	}
 	updatableMask = m
 }

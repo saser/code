@@ -206,6 +206,12 @@ def go_repositories():
         sum = "h1:TrB8swr/68K7m9CcGut2g3UOihhbcbiMAYiuTXdEih4=",
         version = "v0.5.0",
     )
+    go_repository(
+        name = "com_github_go_logr_logr",
+        importpath = "github.com/go-logr/logr",
+        sum = "h1:QK40JKJyMdUDz+h+xvCsru/bJhvG0UxvePV0ufL/AcE=",
+        version = "v1.2.0",
+    )
 
     go_repository(
         name = "com_github_go_stack_stack",
@@ -232,8 +238,8 @@ def go_repositories():
     go_repository(
         name = "com_github_golang_glog",
         importpath = "github.com/golang/glog",
-        sum = "h1:nfP3RFugxnNRyKgeWd4oI1nYvXpxrx8ck8ZrcizshdQ=",
-        version = "v1.0.0",
+        sum = "h1:VKtxabqXZkF25pY9ekfRL6a582T4P37/31XEstQ5p58=",
+        version = "v0.0.0-20160126235308-23def4e6c14b",
     )
 
     go_repository(
@@ -656,6 +662,12 @@ def go_repositories():
         importpath = "gopkg.in/yaml.v3",
         sum = "h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=",
         version = "v3.0.1",
+    )
+    go_repository(
+        name = "io_k8s_klog_v2",
+        importpath = "k8s.io/klog/v2",
+        sum = "h1:atnLQ121W371wYYFawwYx1aEY2eUfs4l3J72wtgAwV4=",
+        version = "v2.80.1",
     )
 
     go_repository(

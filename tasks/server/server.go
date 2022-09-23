@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"strconv"
 
-	"github.com/golang/glog"
 	"go.saser.se/auth/n/basic"
 	"go.saser.se/postgres"
 	"go.saser.se/tasks/service"
@@ -21,10 +20,15 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"k8s.io/klog/v2"
 
 	// Imported for side-effects.
-	_ "google.golang.org/grpc/grpclog/glogger"
+	_ "go.saser.se/grpclog/klogger"
 )
+
+func init() {
+	klog.InitFlags(flag.CommandLine)
+}
 
 var (
 	portFlag           = flag.Int("port", -1, "Port to serve gRPC requests on. If negative, use the PORT environment variable instead. If zero, use whatever the operating system gives us.")
@@ -44,19 +48,19 @@ func errmain() error {
 	port := *portFlag
 	if port < 0 {
 		envPort := os.Getenv("PORT")
-		glog.Infof("Flag -port=%d is negative; using the environment variable PORT=%q instead", port, envPort)
+		klog.Infof("Flag -port=%d is negative; using the environment variable PORT=%q instead", port, envPort)
 		var err error
 		port, err = strconv.Atoi(envPort)
 		if err != nil {
 			return fmt.Errorf("using $PORT failed: %w", err)
 		}
 	}
-	glog.Infof("Will listen on port %d.", port)
+	klog.Infof("Will listen on port %d.", port)
 
 	if *postgresConnString == "" {
 		return errors.New("-postgres_conn_string is empty")
 	}
-	glog.Infof("Will connect to Postgres with connection string: %q", *postgresConnString)
+	klog.Infof("Will connect to Postgres with connection string: %q", *postgresConnString)
 
 	if *username == "" || *password == "" {
 		return fmt.Errorf("-username=%q and -password=%q; both must be non-empty", *username, *password)
@@ -69,14 +73,14 @@ func errmain() error {
 	}
 	var transportCreds credentials.TransportCredentials
 	if !hasCert {
-		glog.Infof("No certificate was given in -cert_file and -key_file; will serve WITHOUT transport security.")
+		klog.Infof("No certificate was given in -cert_file and -key_file; will serve WITHOUT transport security.")
 		transportCreds = insecure.NewCredentials()
 	} else {
 		creds, err := credentials.NewServerTLSFromFile(*certFile, *keyFile)
 		if err != nil {
 			return fmt.Errorf("-cert_file=%q and -key_file=%q is invalid: %w", *certFile, *keyFile, err)
 		}
-		glog.Infof("Will serve WITH transport security loaded from -cert_file=%q and -key_file=%q", *certFile, *keyFile)
+		klog.Infof("Will serve WITH transport security loaded from -cert_file=%q and -key_file=%q", *certFile, *keyFile)
 		transportCreds = creds
 	}
 
@@ -91,17 +95,17 @@ func errmain() error {
 		// this listener, the listener will already have been closed. So we only
 		// log the error if it is something else.
 		if err := lis.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			glog.Errorf("Failed to close listener on address %q: %v", addr, err)
+			klog.Errorf("Failed to close listener on address %q: %v", addr, err)
 		}
 	}()
-	glog.Infof("Created listener on address %q.", addr)
+	klog.Infof("Created listener on address %q.", addr)
 
 	pool, err := postgres.Open(ctx, *postgresConnString)
 	if err != nil {
 		return fmt.Errorf("failed to connect to Postgres: %w", err)
 	}
 	defer pool.Close()
-	glog.Infof("Created Postgres connection pool with connection string: %q", *postgresConnString)
+	klog.Infof("Created Postgres connection pool with connection string: %q", *postgresConnString)
 
 	interceptor, err := basic.Interceptor(*username, *password)
 	if err != nil {
@@ -116,15 +120,15 @@ func errmain() error {
 
 	errc := make(chan error, 1)
 	go func() {
-		glog.Infof("Serving gRPC server on %q...", addr)
+		klog.Infof("Serving gRPC server on %q...", addr)
 		errc <- srv.Serve(lis)
 	}()
 
-	glog.Info("Blocking on context cancellation...")
+	klog.Info("Blocking on context cancellation...")
 	<-ctx.Done()
-	glog.Info("Context cancelled; gracefully stopping gRPC server...")
+	klog.Info("Context cancelled; gracefully stopping gRPC server...")
 	srv.GracefulStop()
-	glog.Info("Stopped gRPC server.")
+	klog.Info("Stopped gRPC server.")
 
 	if err := <-errc; err != nil {
 		return fmt.Errorf("failed to serve gRPC server: %w", err)
@@ -135,6 +139,6 @@ func errmain() error {
 
 func main() {
 	if err := errmain(); err != nil {
-		glog.Exit(err)
+		klog.Exit(err)
 	}
 }

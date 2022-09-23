@@ -9,11 +9,15 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 
 	// For embedding the template.
 	_ "embed"
 )
+
+func init() {
+	klog.InitFlags(flag.CommandLine)
+}
 
 var (
 	region = flag.String("region", "", "GCP region.")
@@ -57,6 +61,6 @@ func errmain() error {
 
 func main() {
 	if err := errmain(); err != nil {
-		glog.Exit(err)
+		klog.Exit(err)
 	}
 }
