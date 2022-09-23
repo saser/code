@@ -6,9 +6,13 @@ go_library(
     importpath = "go.saser.se/tasks/tui",
     visibility = ["//visibility:private"],
     deps = [
+        "//auth/n/basic",
+        "//tasks/tasks_go_proto",
         "//tasks/tui/root",
         "@com_github_charmbracelet_bubbletea//:bubbletea",
         "@io_k8s_klog_v2//:klog",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//credentials",
     ],
 )
 

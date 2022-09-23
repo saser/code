@@ -6,15 +6,20 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	pb "go.saser.se/tasks/tasks_go_proto"
 )
 
 type Model struct {
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	client pb.TasksClient
 }
 
-func New(ctx context.Context) *Model {
-	m := &Model{}
+func New(ctx context.Context, client pb.TasksClient) *Model {
+	m := &Model{
+		client: client,
+	}
 	m.ctx, m.cancel = context.WithCancel(ctx)
 	return m
 }

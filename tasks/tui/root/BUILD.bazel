@@ -5,5 +5,8 @@ go_library(
     srcs = ["root.go"],
     importpath = "go.saser.se/tasks/tui/root",
     visibility = ["//visibility:public"],
-    deps = ["@com_github_charmbracelet_bubbletea//:bubbletea"],
+    deps = [
+        "//tasks/tasks_go_proto",
+        "@com_github_charmbracelet_bubbletea//:bubbletea",
+    ],
 )
