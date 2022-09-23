@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"os"
+	"os/signal"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"go.saser.se/tasks/tui/root"
@@ -13,7 +16,9 @@ func init() {
 }
 
 func errmain() error {
-	if err := tea.NewProgram(root.New(), tea.WithAltScreen()).Start(); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	if err := tea.NewProgram(root.New(ctx), tea.WithAltScreen()).Start(); err != nil {
 		return err
 	}
 	return nil
