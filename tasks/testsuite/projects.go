@@ -43,7 +43,6 @@ func (s *Suite) TestGetProject() {
 func (s *Suite) TestGetProject_AfterDeletion() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
@@ -272,7 +271,6 @@ func (s *Suite) TestListProjects_DifferentPageSizes() {
 func (s *Suite) TestListProjects_WithDeletions() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	seed := []*pb.Project{
 		{Title: "First project"},
@@ -372,7 +370,6 @@ func (s *Suite) TestListProjects_WithDeletions() {
 func (s *Suite) TestListProjects_WithDeletions_ShowDeleted() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	want := s.client.CreateProjectsT(ctx, t, []*pb.Project{
 		{Title: "Buy milk"},
@@ -1053,7 +1050,6 @@ func (s *Suite) TestUpdateProject_Error() {
 func (s *Suite) TestUpdateProject_AfterDeletion() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
 			Title:       "A project that will be deleted",
@@ -1080,7 +1076,6 @@ func (s *Suite) TestUpdateProject_AfterDeletion() {
 func (s *Suite) TestDeleteProject() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{Title: "This will be deleted"},
@@ -1117,7 +1112,6 @@ func (s *Suite) TestDeleteProject() {
 func (s *Suite) TestDeleteProject_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 	for _, tt := range []struct {
 		name string
 		req  *pb.DeleteProjectRequest

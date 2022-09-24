@@ -708,6 +708,32 @@ func (f *Fake) UpdateProject(ctx context.Context, req *pb.UpdateProjectRequest) 
 	return updated, nil
 }
 
+func (f *Fake) DeleteProject(ctx context.Context, req *pb.DeleteProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if err := validateProjectName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.projectIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	deleted := f.projects[idx]
+	if deleted.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	now := f.now()
+	deleted.DeleteTime = timestamppb.New(now)
+	deleted.ExpireTime = timestamppb.New(now.AddDate(0 /*years*/, 0 /*months*/, 30 /*days*/))
+	return proto.Clone(deleted).(*pb.Project), nil
+}
+
 // now returns time.Now() except if f.clock is non-nil, then that clock is used
 // instead. now assumes that the mutex is held when called.
 func (f *Fake) now() time.Time {

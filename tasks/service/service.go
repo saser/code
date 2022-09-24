@@ -1299,6 +1299,79 @@ func (s *Service) UpdateProject(ctx context.Context, req *pb.UpdateProjectReques
 	return updatedProject, nil
 }
 
+func (s *Service) DeleteProject(ctx context.Context, req *pb.DeleteProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if !strings.HasPrefix(name, "projects/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(name, "projects/"), 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	// deleted will eventually be returned as the updated version of the project.
+	var deleted *pb.Project
+
+	txFunc := func(tx pgx.Tx) error {
+		var err error
+
+		// We must do two things:
+		//     1. Ensure that the project being deleted exists.
+		//     2. Return the new version of the project when it has been deleted.
+		// To kill both these birds with one stone, we get the project from the
+		// database here. If it doesn't exist, we will get an error. If it does
+		// exist, we will get all the details and don't need to query for them
+		// later.
+		deleted, err = queryProjectByID(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+
+		// We "delete" projects by setting their `delete_time` and `expire_time`
+		// fields. `delete_time` should be set to the current time, and
+		// `expire_time` is arbitrarily chosen to be some point in the future.
+		deleteTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		expireTime := deleteTime.AddDate(0 /* years */, 0 /* months */, 30 /* days */)
+
+		// These new timestamps should be reflected in the returned version of
+		// the project.
+		deleted.DeleteTime = timestamppb.New(deleteTime)
+		deleted.ExpireTime = timestamppb.New(expireTime)
+
+		// Below is the actual update in the database. We only update and don't
+		// return anything back, because we have already fetched everything
+		// using projectByID above.
+		sql, args, err := postgres.StatementBuilder.
+			Update("projects").
+			SetMap(map[string]interface{}{
+				"delete_time": deleteTime,
+				"expire_time": expireTime,
+			}).
+			Where(squirrel.Eq{
+				"id": id,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
+	}
+	if err := s.pool.BeginFunc(ctx, txFunc); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return deleted, nil
+}
+
 // queryDescendantIDs returns the IDs of all tasks descending, directly or
 // transitively, from rootID. Note that rootID is itself not included in the
 // resulting slice. If showDeleted is true, IDs from deleted descendant tasks
