@@ -22,6 +22,26 @@ CREATE TABLE tasks (
     CONSTRAINT delete_time_not_after_expire_time CHECK (delete_time IS NULL OR delete_time <= expire_time)
 );
 
+-- The main table of projects.
+CREATE TABLE projects (
+    id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    archive_time TIMESTAMP WITH TIME ZONE, -- If non-null, then project is archived.
+    create_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    update_time TIMESTAMP WITH TIME ZONE, -- If non-null, then project has been updated at least once.
+    delete_time TIMESTAMP WITH TIME ZONE, -- If non-null, then project is considered deleted.
+    expire_time TIMESTAMP WITH TIME ZONE,
+
+    PRIMARY KEY (id),
+    CONSTRAINT title_not_empty CHECK (title <> ''),
+    CONSTRAINT create_time_not_after_archive_time CHECK (archive_time IS NULL OR create_time <= archive_time),
+    CONSTRAINT create_time_not_after_delete_time CHECK (delete_time IS NULL OR create_time <= delete_time),
+    CONSTRAINT create_time_not_after_update_time CHECK (update_time IS NULL OR create_time <= update_time),
+    CONSTRAINT delete_time_iff_expire_time CHECK ((delete_time IS NULL) = (expire_time IS NULL)),
+    CONSTRAINT delete_time_not_after_expire_time CHECK (delete_time IS NULL OR delete_time <= expire_time)
+);
+
 -- A table of page tokens. The rows in this table define the set of acceptable
 -- values for ListTasksRequest.next_page_token.
 CREATE TABLE page_tokens (

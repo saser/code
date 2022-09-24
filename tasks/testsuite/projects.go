@@ -599,7 +599,6 @@ func (s *Suite) TestListProjects_Error() {
 func (s *Suite) TestCreateProject() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	project := &pb.Project{Title: "Hello Projects"}
 	req := &pb.CreateProjectRequest{
@@ -626,7 +625,6 @@ func (s *Suite) TestCreateProject() {
 func (s *Suite) TestCreateProject_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 	for _, tt := range []struct {
 		name string
 		req  *pb.CreateProjectRequest

@@ -56,10 +56,15 @@ type Fake struct {
 	pb.UnimplementedTasksServer
 
 	mu          sync.Mutex
-	nextID      int
+	nextTaskID  int
 	tasks       []*pb.Task
-	taskIndices map[string]int       // task name -> index in `tasks`
-	pageTokens  map[string]pageToken // token (UUID) -> minimum ID and whether to show deleted
+	taskIndices map[string]int // task name -> index in `tasks`
+
+	nextProjectID  int
+	projects       []*pb.Project
+	projectIndices map[string]int // project name -> index in `projects`
+
+	pageTokens map[string]pageToken // token (UUID) -> minimum ID and whether to show deleted
 
 	// Only used in testing. Nil otherwise.
 	clock clockwork.FakeClock
@@ -68,15 +73,20 @@ type Fake struct {
 // New creates a new Fake ready to use.
 func New() *Fake {
 	return &Fake{
-		nextID:      1,
+		nextTaskID:  1,
 		tasks:       nil,
 		taskIndices: make(map[string]int),
-		pageTokens:  make(map[string]pageToken),
+
+		nextProjectID:  1,
+		projects:       nil,
+		projectIndices: make(map[string]int),
+
+		pageTokens: make(map[string]pageToken),
 	}
 }
 
-// validateName returns an error if name isn't a valid task name.
-func validateName(name string) error {
+// validateTaskName returns an error if name isn't a valid task name.
+func validateTaskName(name string) error {
 	const prefix = "tasks/"
 	if !strings.HasPrefix(name, prefix) {
 		return &invalidNameError{
@@ -140,7 +150,7 @@ func (f *Fake) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task, e
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if err := validateName(name); err != nil {
+	if err := validateTaskName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
 
@@ -225,7 +235,7 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 	defer f.mu.Unlock()
 
 	if parent := task.GetParent(); parent != "" {
-		if err := validateName(parent); err != nil {
+		if err := validateTaskName(parent); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, `The name of the parent must follow the format "tasks/{task}", but it was %q.`, parent)
 		}
 		if _, ok := f.taskIndices[parent]; !ok {
@@ -234,8 +244,8 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 	}
 
 	created := proto.Clone(task).(*pb.Task)
-	id := f.nextID
-	f.nextID++
+	id := f.nextTaskID
+	f.nextTaskID++
 	created.Name = "tasks/" + fmt.Sprint(id)
 	created.CreateTime = timestamppb.New(f.now())
 	f.tasks = append(f.tasks, created)
@@ -251,7 +261,7 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if err := validateName(name); err != nil {
+	if err := validateTaskName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
 	updateMask := req.GetUpdateMask()
@@ -325,7 +335,7 @@ func (f *Fake) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*pb.T
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if err := validateName(name); err != nil {
+	if err := validateTaskName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
 
@@ -364,7 +374,7 @@ func (f *Fake) UndeleteTask(ctx context.Context, req *pb.UndeleteTaskRequest) (*
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if err := validateName(name); err != nil {
+	if err := validateTaskName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
 
@@ -404,7 +414,7 @@ func (f *Fake) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest) (*
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if err := validateName(name); err != nil {
+	if err := validateTaskName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
 
@@ -449,7 +459,7 @@ func (f *Fake) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequest
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
 	}
-	if err := validateName(name); err != nil {
+	if err := validateTaskName(name); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
 	}
 
@@ -490,6 +500,25 @@ func (f *Fake) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequest
 		uncompleted.UpdateTime = timestamppb.New(now)
 	}
 	return proto.Clone(task).(*pb.Task), nil
+}
+
+func (f *Fake) CreateProject(ctx context.Context, req *pb.CreateProjectRequest) (*pb.Project, error) {
+	project := req.GetProject()
+	if project.GetTitle() == "" {
+		return nil, status.Error(codes.InvalidArgument, "The project must have a title.")
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	created := proto.Clone(project).(*pb.Project)
+	id := f.nextProjectID
+	f.nextProjectID++
+	created.Name = "projects/" + fmt.Sprint(id)
+	created.CreateTime = timestamppb.New(f.now())
+	f.projects = append(f.projects, created)
+	f.projectIndices[created.Name] = len(f.projects) - 1
+	return created, nil
 }
 
 // now returns time.Now() except if f.clock is non-nil, then that clock is used

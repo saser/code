@@ -79,7 +79,7 @@ func (t *truncater) Truncate(ctx context.Context) error {
 	for k := range t.s.taskIndices {
 		delete(t.s.taskIndices, k)
 	}
-	t.s.nextID = 1
+	t.s.nextTaskID = 1
 	return nil
 }
 
