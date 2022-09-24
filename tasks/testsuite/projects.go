@@ -1146,7 +1146,6 @@ func (s *Suite) TestDeleteProject_Error() {
 func (s *Suite) TestUndeleteProject() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	// Create project, soft delete it, then undelete it. The result should be the
 	// same project as just after it was created.
@@ -1170,7 +1169,6 @@ func (s *Suite) TestUndeleteProject() {
 func (s *Suite) TestUndeleteProject_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
 			Title: "Buy milk",

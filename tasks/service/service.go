@@ -1372,6 +1372,71 @@ func (s *Service) DeleteProject(ctx context.Context, req *pb.DeleteProjectReques
 	return deleted, nil
 }
 
+func (s *Service) UndeleteProject(ctx context.Context, req *pb.UndeleteProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if !strings.HasPrefix(name, "projects/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(name, "projects/"), 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	var project *pb.Project
+	errNotFound := errors.New("project does not exist")
+	errNotDeleted := errors.New("project has not been deleted")
+	errExpired := errors.New("project has expired")
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		now, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		project, err = queryProjectByID(ctx, tx, id, true /*showDeleted*/)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return errNotFound
+			}
+			return err
+		}
+		if !project.GetDeleteTime().IsValid() {
+			return errNotDeleted
+		}
+		if now.After(project.GetExpireTime().AsTime()) {
+			return errExpired
+		}
+
+		sql, args, err := postgres.StatementBuilder.
+			Update("projects").
+			SetMap(map[string]interface{}{
+				"delete_time": nil,
+				"expire_time": nil,
+			}).
+			Where(squirrel.Eq{
+				"id": id,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
+	}); err != nil {
+		if errors.Is(err, errNotFound) || errors.Is(err, errExpired) {
+			return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+		}
+		if errors.Is(err, errNotDeleted) {
+			return nil, status.Errorf(codes.AlreadyExists, "A project with name %q already exists.", name)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	project.DeleteTime = nil
+	project.ExpireTime = nil
+	return project, nil
+}
+
 // queryDescendantIDs returns the IDs of all tasks descending, directly or
 // transitively, from rootID. Note that rootID is itself not included in the
 // resulting slice. If showDeleted is true, IDs from deleted descendant tasks
