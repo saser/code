@@ -1437,6 +1437,125 @@ func (s *Service) UndeleteProject(ctx context.Context, req *pb.UndeleteProjectRe
 	return project, nil
 }
 
+func (s *Service) ArchiveProject(ctx context.Context, req *pb.ArchiveProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if !strings.HasPrefix(name, "projects/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	resourceID := strings.TrimPrefix(name, "projects/")
+	if resourceID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(resourceID, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+
+	var project *pb.Project
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		var err error
+		project, err = queryProjectByID(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		// Special case: a archived project can be archived again, which is a
+		// no-op.
+		if project.GetArchiveTime().IsValid() {
+			return nil
+		}
+		archiveTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		project.ArchiveTime = timestamppb.New(archiveTime)
+		project.UpdateTime = timestamppb.New(archiveTime)
+		sql, args, err := postgres.StatementBuilder.
+			Update("projects").
+			SetMap(map[string]interface{}{
+				"archive_time": archiveTime,
+				"update_time":  archiveTime,
+			}).
+			Where(squirrel.Eq{
+				"id": id,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return project, nil
+}
+
+func (s *Service) UnarchiveProject(ctx context.Context, req *pb.UnarchiveProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if !strings.HasPrefix(name, "projects/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	resourceID := strings.TrimPrefix(name, "projects/")
+	if resourceID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(resourceID, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+
+	var project *pb.Project
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		var err error
+		project, err = queryProjectByID(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		// Special case: uncompleting an unarchived project is a no-op.
+		if !project.GetArchiveTime().IsValid() {
+			return nil
+		}
+		updateTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		project.ArchiveTime = nil
+		project.UpdateTime = timestamppb.New(updateTime)
+		sql, args, err := postgres.StatementBuilder.
+			Update("projects").
+			SetMap(map[string]interface{}{
+				"archive_time": nil,
+				"update_time":  updateTime,
+			}).
+			Where(squirrel.Eq{
+				"id": id,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return project, nil
+}
+
 // queryDescendantIDs returns the IDs of all tasks descending, directly or
 // transitively, from rootID. Note that rootID is itself not included in the
 // resulting slice. If showDeleted is true, IDs from deleted descendant tasks

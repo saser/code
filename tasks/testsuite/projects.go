@@ -536,7 +536,6 @@ func (s *Suite) TestListProjects_ChangeRequestBetweenPages() {
 func (s *Suite) TestListProjects_IncludesArchived() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	projects := s.client.CreateProjectsT(ctx, t, []*pb.Project{
 		{Title: "kick ass"},
@@ -1222,7 +1221,6 @@ func (s *Suite) TestUndeleteProject_Error() {
 func (s *Suite) TestArchiveProject_UnarchiveProject_ClearsArchiveTime() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
@@ -1263,9 +1261,8 @@ func (s *Suite) TestArchiveProject_UnarchiveProject_ClearsArchiveTime() {
 func (s *Suite) TestArchiveProject_AlreadyArchived() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
-	// When trying to complete a project that is already completed, it should be a
+	// When trying to archive a project that is already archived, it should be a
 	// no-op and the project should be returned unmodified. We detect this by
 	// simulating time passing, which should be the only change in the world
 	// between the various operations on the project.
@@ -1295,7 +1292,6 @@ func (s *Suite) TestArchiveProject_AlreadyArchived() {
 func (s *Suite) TestArchiveProject_Deleted() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
@@ -1318,7 +1314,6 @@ func (s *Suite) TestArchiveProject_Deleted() {
 func (s *Suite) TestArchiveProject_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	for _, tt := range []struct {
 		name string
@@ -1366,7 +1361,6 @@ func (s *Suite) TestArchiveProject_Error() {
 func (s *Suite) TestUnarchiveProject_NotArchived() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
@@ -1379,6 +1373,6 @@ func (s *Suite) TestUnarchiveProject_NotArchived() {
 		Name: project.GetName(),
 	})
 	if diff := cmp.Diff(project, got, protocmp.Transform()); diff != "" {
-		t.Fatalf("Uncompleting an uncompleted project wasn't a no-op (-want +got)\n%s", diff)
+		t.Fatalf("Uncompleting an unarchived project wasn't a no-op (-want +got)\n%s", diff)
 	}
 }

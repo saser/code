@@ -759,6 +759,66 @@ func (f *Fake) UndeleteProject(ctx context.Context, req *pb.UndeleteProjectReque
 	return proto.Clone(undeleted).(*pb.Project), nil
 }
 
+func (f *Fake) ArchiveProject(ctx context.Context, req *pb.ArchiveProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if err := validateProjectName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.projectIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	project := f.projects[idx]
+	if project.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	// Special case: an archived project can be archived again, which is a no-op.
+	if project.GetArchiveTime().IsValid() {
+		return proto.Clone(project).(*pb.Project), nil
+	}
+	now := f.now()
+	project.ArchiveTime = timestamppb.New(now)
+	project.UpdateTime = timestamppb.New(now)
+	return proto.Clone(project).(*pb.Project), nil
+}
+
+func (f *Fake) UnarchiveProject(ctx context.Context, req *pb.UnarchiveProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if err := validateProjectName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.projectIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	project := f.projects[idx]
+	if project.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	// Special case: uncompleting an unarchived project is a no-op.
+	if !project.GetArchiveTime().IsValid() {
+		return proto.Clone(project).(*pb.Project), nil
+	}
+	now := f.now()
+	project.ArchiveTime = nil
+	project.UpdateTime = timestamppb.New(now)
+	return proto.Clone(project).(*pb.Project), nil
+}
+
 // now returns time.Now() except if f.clock is non-nil, then that clock is used
 // instead. now assumes that the mutex is held when called.
 func (f *Fake) now() time.Time {
