@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "client.go",
         "doc.go",
+        "tasks.go",
         "testsuite.go",
     ],
     importpath = "go.saser.se/tasks/testsuite",
