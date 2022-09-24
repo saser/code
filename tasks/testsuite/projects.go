@@ -645,7 +645,6 @@ func (s *Suite) TestCreateProject_Error() {
 func (s *Suite) TestUpdateProject() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 	// Clock will be reset to createTime before the project is created.
 	createTime := s.clock.Now()
 	createTimeMessage := timestamppb.New(createTime)
@@ -871,7 +870,7 @@ func (s *Suite) TestUpdateProject() {
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			// We need to reset the time to creatTime.
+			// We need to reset the time to createTime.
 			// We want to find `d` such that `now + d = createTime.`
 			// Therefore `d = createTime - now.`
 			s.clock.Advance(createTime.Sub(s.clock.Now()))
@@ -906,7 +905,6 @@ func (s *Suite) TestUpdateProject() {
 func (s *Suite) TestUpdateProject_MultipleUpdates() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	// This test asserts that the update time is changed everytime the project is
 	// updated.
@@ -947,7 +945,6 @@ func (s *Suite) TestUpdateProject_MultipleUpdates() {
 func (s *Suite) TestUpdateProject_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
 			Title:       "Some project",

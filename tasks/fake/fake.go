@@ -31,9 +31,9 @@ const maxPageSize = 1000
 // invalid request, something cannot be found, etc.
 var internalError = status.Error(codes.Internal, "Something went wrong.")
 
-// updatableMask contains the fields that can be updated by UpdateTask. It must
+// taskUpdatableMask contains the fields that can be updated by UpdateTask. It must
 // be kept in sync with the proto definition.
-var updatableMask *fieldmaskpb.FieldMask
+var taskUpdatableMask *fieldmaskpb.FieldMask
 
 func init() {
 	m, err := fieldmaskpb.New(&pb.Task{},
@@ -43,7 +43,22 @@ func init() {
 	if err != nil {
 		klog.Exit(err)
 	}
-	updatableMask = m
+	taskUpdatableMask = m
+}
+
+// projectUpdatableMask contains the fields that can be updated by UpdateProject. It must
+// be kept in sync with the proto definition.
+var projectUpdatableMask *fieldmaskpb.FieldMask
+
+func init() {
+	m, err := fieldmaskpb.New(&pb.Task{},
+		"title",
+		"description",
+	)
+	if err != nil {
+		klog.Exit(err)
+	}
+	projectUpdatableMask = m
 }
 
 type pageToken struct {
@@ -302,7 +317,7 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 			updateMask.Paths = append(updateMask.GetPaths(), "description")
 		}
 	case len(paths) == 1 && paths[0] == "*":
-		updateMask = proto.Clone(updatableMask).(*fieldmaskpb.FieldMask)
+		updateMask = proto.Clone(taskUpdatableMask).(*fieldmaskpb.FieldMask)
 	}
 	for _, path := range updateMask.GetPaths() {
 		switch path {
@@ -614,6 +629,83 @@ func (f *Fake) ListProjects(ctx context.Context, req *pb.ListProjectsRequest) (*
 		res.NextPageToken = token
 	}
 	return res, nil
+}
+
+func (f *Fake) UpdateProject(ctx context.Context, req *pb.UpdateProjectRequest) (*pb.Project, error) {
+	// First we do stateless validation, i.e., look for errors that we can find
+	// by only looking at the request message.
+	patch := req.GetProject()
+	name := patch.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if err := validateProjectName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	updateMask := req.GetUpdateMask()
+	if updateMask == nil {
+		// This is not really necessary, but makes downstream handling easier by
+		// not having to be careful about nil derefs.
+		updateMask = &fieldmaskpb.FieldMask{}
+	}
+	// Handle two special cases:
+	// 1. The update mask is nil or empty. Then it should be equivalent to
+	//    updating all non-empty fields in the patch.
+	// 2. The update mask contains a single path that is the wildcard ("*").
+	// 	  Then it should be treated as specifying all updatable paths.
+	switch paths := updateMask.GetPaths(); {
+	case len(paths) == 0:
+		if v := patch.GetTitle(); v != "" {
+			updateMask.Paths = append(updateMask.GetPaths(), "title")
+		}
+		if v := patch.GetDescription(); v != "" {
+			updateMask.Paths = append(updateMask.GetPaths(), "description")
+		}
+	case len(paths) == 1 && paths[0] == "*":
+		updateMask = proto.Clone(projectUpdatableMask).(*fieldmaskpb.FieldMask)
+	}
+	for _, path := range updateMask.GetPaths() {
+		switch path {
+		case "parent", "completed", "create_time", "name":
+			return nil, status.Errorf(codes.InvalidArgument, "The field %q cannot be updated with UpdateProject.", path)
+		case "*":
+			// We handled the only valid case of giving a wildcard path above,
+			// i.e., when it is the only path.
+			return nil, status.Error(codes.InvalidArgument, "A wildcard can only be used if it is the single path in the update mask.")
+		}
+	}
+	if updateMask != nil && !updateMask.IsValid(&pb.Project{}) {
+		return nil, status.Error(codes.InvalidArgument, "The given update mask is invalid.")
+	}
+	// At this point we know that updateMask is not empty and is a valid mask.
+	// The path(s) fully specify what we should get from the patch. It may still
+	// be the case that the patch is empty.
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.projectIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	project := f.projects[idx]
+	if project.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	updated := proto.Clone(project).(*pb.Project)
+	for _, path := range updateMask.GetPaths() {
+		switch path {
+		case "title":
+			updated.Title = patch.GetTitle()
+		case "description":
+			updated.Description = patch.GetDescription()
+		}
+	}
+	if !proto.Equal(project, updated) {
+		updated.UpdateTime = timestamppb.New(f.now())
+	}
+	f.projects[idx] = updated
+	return updated, nil
 }
 
 // now returns time.Now() except if f.clock is non-nil, then that clock is used

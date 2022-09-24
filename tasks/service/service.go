@@ -35,9 +35,9 @@ const maxPageSize = 1000
 // invalid request, something cannot be found, etc.
 var internalError = status.Error(codes.Internal, "Something went wrong.")
 
-// updatableMask contains the fields that can be updated by UpdateTask. It must
+// taskUpdatableMask contains the fields that can be updated by UpdateTask. It must
 // be kept in sync with the proto definition.
-var updatableMask *fieldmaskpb.FieldMask
+var taskUpdatableMask *fieldmaskpb.FieldMask
 
 func init() {
 	m, err := fieldmaskpb.New(&pb.Task{},
@@ -47,7 +47,22 @@ func init() {
 	if err != nil {
 		klog.Exit(err)
 	}
-	updatableMask = m
+	taskUpdatableMask = m
+}
+
+// projectUpdatableMask contains the fields that can be updated by UpdateProject. It must
+// be kept in sync with the proto definition.
+var projectUpdatableMask *fieldmaskpb.FieldMask
+
+func init() {
+	m, err := fieldmaskpb.New(&pb.Task{},
+		"title",
+		"description",
+	)
+	if err != nil {
+		klog.Exit(err)
+	}
+	projectUpdatableMask = m
 }
 
 type Service struct {
@@ -410,7 +425,7 @@ func (s *Service) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*p
 			updateMask.Paths = append(updateMask.GetPaths(), "description")
 		}
 	case len(paths) == 1 && paths[0] == "*":
-		updateMask = proto.Clone(updatableMask).(*fieldmaskpb.FieldMask)
+		updateMask = proto.Clone(taskUpdatableMask).(*fieldmaskpb.FieldMask)
 	}
 	for _, path := range updateMask.GetPaths() {
 		switch path {
@@ -1153,6 +1168,135 @@ func (s *Service) ListProjects(ctx context.Context, req *pb.ListProjectsRequest)
 		return nil, internalError
 	}
 	return res, nil
+}
+
+func (s *Service) UpdateProject(ctx context.Context, req *pb.UpdateProjectRequest) (*pb.Project, error) {
+	// First we do stateless validation, i.e., look for errors that we can find
+	// by only looking at the request message.
+	patch := req.GetProject()
+	name := patch.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if !strings.HasPrefix(name, "projects/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(name, "projects/"), 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	updateMask := req.GetUpdateMask()
+	if updateMask == nil {
+		// This is not really necessary, but makes downstream handling easier by
+		// not having to be careful about nil derefs.
+		updateMask = &fieldmaskpb.FieldMask{}
+	}
+	// Handle two special cases:
+	// 1. The update mask is nil or empty. Then it should be equivalent to
+	//    updating all non-empty fields in the patch.
+	// 2. The update mask contains a single path that is the wildcard ("*").
+	// 	  Then it should be treated as specifying all updatable paths.
+	switch paths := updateMask.GetPaths(); {
+	case len(paths) == 0:
+		if v := patch.GetTitle(); v != "" {
+			updateMask.Paths = append(updateMask.GetPaths(), "title")
+		}
+		if v := patch.GetDescription(); v != "" {
+			updateMask.Paths = append(updateMask.GetPaths(), "description")
+		}
+	case len(paths) == 1 && paths[0] == "*":
+		updateMask = proto.Clone(projectUpdatableMask).(*fieldmaskpb.FieldMask)
+	}
+	for _, path := range updateMask.GetPaths() {
+		switch path {
+		case "parent", "completed", "create_time", "name":
+			return nil, status.Errorf(codes.InvalidArgument, "The field %q cannot be updated with UpdateProject.")
+		case "*":
+			// We handled the only valid case of giving a wildcard path above,
+			// i.e., when it is the only path.
+			return nil, status.Error(codes.InvalidArgument, "A wildcard can only be used if it is the single path in the update mask.")
+		}
+	}
+	if updateMask != nil && !updateMask.IsValid(&pb.Project{}) {
+		return nil, status.Error(codes.InvalidArgument, "The given update mask is invalid.")
+	}
+	// At this point we know that updateMask is not empty and is a valid mask.
+	// The path(s) fully specify what we should get from the patch. It may still
+	// be the case that the patch is empty.
+
+	// updatedProject is the new version of the project that should eventually be
+	// returned as the result of the update operation -- even if it is a no-op.
+	var updatedProject *pb.Project
+
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		// Eventually, we need to return either an error or the project, regardless
+		// of whether it has been updated or not. So let's fetch it here, so we
+		// quickly find out if it doesn't exist. If it does exist, we also get
+		// all the details we eventually need to return about it.
+		updatedProject, err = queryProjectByID(ctx, tx, id, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		// Special case: the patch is empty so we should just return the current
+		// version of the project which we fetched above.
+		if proto.Equal(patch, &pb.Project{Name: name} /* empty patch except for the name */) {
+			return nil
+		}
+		// Special case: the update mask is empty, meaning that the operation
+		// will be a no-op even if the patch isn't empty.
+		if len(updateMask.GetPaths()) == 0 {
+			return nil
+		}
+		// Special case: the patch isn't empty and at least one path is
+		// specified, but the applying the patch will yield an identical
+		// resource.
+		afterPatch := proto.Clone(updatedProject).(*pb.Project)
+		proto.Merge(afterPatch, patch)
+		if proto.Equal(afterPatch, updatedProject) {
+			return nil
+		}
+
+		updateTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		updatedProject.UpdateTime = timestamppb.New(updateTime)
+
+		// Update only the columns corresponding to the fields in the patch.
+		q := postgres.StatementBuilder.
+			Update("projects").
+			Where(squirrel.Eq{
+				"id": id,
+			}).
+			Set("update_time", updateTime)
+		for _, path := range updateMask.GetPaths() {
+			switch path {
+			case "title":
+				v := patch.GetTitle()
+				q = q.Set("title", v)
+				updatedProject.Title = v
+			case "description":
+				v := patch.GetDescription()
+				q = q.Set("description", v)
+				updatedProject.Description = v
+			}
+		}
+
+		sql, args, err := q.ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", patch.GetName())
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+
+	return updatedProject, nil
 }
 
 // queryDescendantIDs returns the IDs of all tasks descending, directly or
