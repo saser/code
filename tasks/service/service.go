@@ -134,7 +134,7 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 		}
 		// First find out what the minimum ID to use in this page is. If this is
 		// the first page, it will be 0. If it is not, then it will be a value
-		// stored in the `page_tokens` database table, and the `page_token`
+		// stored in the `task_page_tokens` database table, and the `page_token`
 		// field in the request contains the key to that table.
 		minID := int64(0)
 		showDeleted := req.GetShowDeleted()
@@ -143,7 +143,7 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 			// supports the RETURNING clause, we can do it in just one
 			// statement. Neat!
 			sql, args, err := postgres.StatementBuilder.
-				Delete("page_tokens").
+				Delete("task_page_tokens").
 				Where(squirrel.Eq{
 					"token": token,
 				}).
@@ -278,7 +278,7 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 		token := uuid.New()
 		res.NextPageToken = token.String()
 		sql, args, err = postgres.StatementBuilder.
-			Insert("page_tokens").
+			Insert("task_page_tokens").
 			Columns("token", "minimum_id", "show_deleted").
 			Values(token, nextMinID, showDeleted).
 			ToSql()
@@ -964,6 +964,195 @@ func (s *Service) GetProject(ctx context.Context, req *pb.GetProjectRequest) (*p
 		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
 	}
 	return project, nil
+}
+
+func (s *Service) ListProjects(ctx context.Context, req *pb.ListProjectsRequest) (*pb.ListProjectsResponse, error) {
+	pageSize := req.GetPageSize()
+	if pageSize < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "The page size must not be negative; was %d.", pageSize)
+	}
+	if pageSize == 0 || pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+	if token := req.GetPageToken(); token != "" {
+		if _, err := uuid.Parse(token); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+		}
+	}
+
+	res := &pb.ListProjectsResponse{}
+	errNoToken := errors.New("page token given but not found")
+	errChangedRequest := errors.New("request changed between pages")
+	txFunc := func(tx pgx.Tx) error {
+		now, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		// First find out what the minimum ID to use in this page is. If this is
+		// the first page, it will be 0. If it is not, then it will be a value
+		// stored in the `project_page_tokens` database table, and the `page_token`
+		// field in the request contains the key to that table.
+		minID := int64(0)
+		showDeleted := req.GetShowDeleted()
+		if token := req.GetPageToken(); token != "" {
+			// We could do a SELECT and then a DELETE, but since Postgres
+			// supports the RETURNING clause, we can do it in just one
+			// statement. Neat!
+			sql, args, err := postgres.StatementBuilder.
+				Delete("project_page_tokens").
+				Where(squirrel.Eq{
+					"token": token,
+				}).
+				Suffix("RETURNING minimum_id, show_deleted").
+				ToSql()
+			if err != nil {
+				return err
+			}
+			if err := tx.QueryRow(ctx, sql, args...).Scan(&minID, &showDeleted); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return errNoToken
+				}
+				return err
+			}
+			if req.GetShowDeleted() != showDeleted {
+				return errChangedRequest
+			}
+		}
+
+		// Now that we know the minimum ID, we can run a SELECT to list projects.
+		// We set a limit of pageSize+1 so that we may get the first project in the
+		// next page (if any). This allows us to do one query that gives us
+		//     1. if there is a next page, and if so,
+		//     2. what the minimum ID will be for that page.
+		var (
+			// The eventual list of projects to return.
+			projects []*pb.Project
+			// The columns in the row.
+			id                                 int64
+			title                              string
+			description                        string
+			archiveTime                        pgtype.Timestamptz
+			createTime                         time.Time
+			updateTime, deleteTime, expireTime pgtype.Timestamptz
+			// To use for the next page, if any.
+			nextMinID int64
+		)
+		st := postgres.StatementBuilder.
+			Select(
+				"id",
+				"title",
+				"description",
+				"archive_time",
+				"create_time",
+				"update_time",
+				"delete_time",
+				"expire_time",
+			).
+			From("projects").
+			Where(squirrel.GtOrEq{
+				"id": minID,
+			})
+		if !showDeleted {
+			st = st.Where(squirrel.Eq{
+				"delete_time": nil,
+			})
+		} else {
+			st = st.Where(squirrel.Or{
+				squirrel.Eq{
+					"expire_time": nil,
+				},
+				squirrel.Gt{
+					"expire_time": now,
+				},
+			})
+		}
+		st = st.
+			OrderBy("id ASC").
+			Limit(uint64(pageSize) + 1)
+		sql, args, err := st.ToSql()
+		if err != nil {
+			return err
+		}
+		// qf is called for every row returned by the above query, after
+		// scanning has completed successfully.
+		qf := func(qfr pgx.QueryFuncRow) error {
+			if id > nextMinID {
+				nextMinID = id
+			}
+			project := &pb.Project{
+				Name:        "projects/" + fmt.Sprint(id),
+				Title:       title,
+				Description: description,
+				CreateTime:  timestamppb.New(createTime),
+			}
+			if archiveTime.Status == pgtype.Present {
+				project.ArchiveTime = timestamppb.New(archiveTime.Time)
+			}
+			if updateTime.Status == pgtype.Present {
+				project.UpdateTime = timestamppb.New(updateTime.Time)
+			}
+			if deleteTime.Status == pgtype.Present {
+				project.DeleteTime = timestamppb.New(deleteTime.Time)
+			}
+			if expireTime.Status == pgtype.Present {
+				project.ExpireTime = timestamppb.New(expireTime.Time)
+			}
+			projects = append(projects, project)
+			return nil
+		}
+		// Here is where the actual query happens.
+		if _, err := tx.QueryFunc(ctx, sql,
+			args,
+			[]interface{}{
+				&id,
+				&title,
+				&description,
+				&archiveTime,
+				&createTime,
+				&updateTime,
+				&deleteTime,
+				&expireTime,
+			},
+			qf,
+		); err != nil {
+			return err
+		}
+
+		// If the number of projects from the above query is less than or equal to
+		// pageSize, we know that there will be no more pages We can then do an
+		// early return.
+		if int32(len(projects)) <= pageSize {
+			res.Projects = projects
+			return nil
+		}
+
+		// We know at this point that there will be at least one more page, so
+		// we limit the projects in this page to the pageSize and then create the
+		// token for the next page.
+		res.Projects = projects[:pageSize]
+		token := uuid.New()
+		res.NextPageToken = token.String()
+		sql, args, err = postgres.StatementBuilder.
+			Insert("project_page_tokens").
+			Columns("token", "minimum_id", "show_deleted").
+			Values(token, nextMinID, showDeleted).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := s.pool.BeginFunc(ctx, txFunc); err != nil {
+		if errors.Is(err, errNoToken) || errors.Is(err, errChangedRequest) {
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return res, nil
 }
 
 // queryDescendantIDs returns the IDs of all tasks descending, directly or

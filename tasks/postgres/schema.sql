@@ -44,9 +44,19 @@ CREATE TABLE projects (
 
 -- A table of page tokens. The rows in this table define the set of acceptable
 -- values for ListTasksRequest.next_page_token.
-CREATE TABLE page_tokens (
+CREATE TABLE task_page_tokens (
     token UUID NOT NULL,
     minimum_id BIGINT NOT NULL REFERENCES tasks (id),
+    show_deleted BOOLEAN NOT NULL,
+
+    PRIMARY KEY (token)
+);
+
+-- A table of page tokens. The rows in this table define the set of acceptable
+-- values for ListProjectsRequest.next_page_token.
+CREATE TABLE project_page_tokens (
+    token UUID NOT NULL,
+    minimum_id BIGINT NOT NULL REFERENCES projects (id),
     show_deleted BOOLEAN NOT NULL,
 
     PRIMARY KEY (token)

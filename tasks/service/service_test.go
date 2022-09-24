@@ -68,7 +68,7 @@ type poolTruncater struct {
 }
 
 func (pt *poolTruncater) Truncate(ctx context.Context) error {
-	_, err := pt.pool.Exec(ctx, "TRUNCATE TABLE tasks, page_tokens")
+	_, err := pt.pool.Exec(ctx, "TRUNCATE TABLE tasks, task_page_tokens, projects, project_page_tokens")
 	return err
 }
 

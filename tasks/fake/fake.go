@@ -55,16 +55,16 @@ type pageToken struct {
 type Fake struct {
 	pb.UnimplementedTasksServer
 
-	mu          sync.Mutex
-	nextTaskID  int
-	tasks       []*pb.Task
-	taskIndices map[string]int // task name -> index in `tasks`
+	mu             sync.Mutex
+	nextTaskID     int
+	tasks          []*pb.Task
+	taskIndices    map[string]int       // task name -> index in `tasks`
+	taskPageTokens map[string]pageToken // token (UUID) -> minimum task ID and whether to show deleted
 
-	nextProjectID  int
-	projects       []*pb.Project
-	projectIndices map[string]int // project name -> index in `projects`
-
-	pageTokens map[string]pageToken // token (UUID) -> minimum ID and whether to show deleted
+	nextProjectID     int
+	projects          []*pb.Project
+	projectIndices    map[string]int       // project name -> index in `projects`
+	projectPageTokens map[string]pageToken // token (UUID) -> minimum project ID and whether to show deleted
 
 	// Only used in testing. Nil otherwise.
 	clock clockwork.FakeClock
@@ -73,15 +73,15 @@ type Fake struct {
 // New creates a new Fake ready to use.
 func New() *Fake {
 	return &Fake{
-		nextTaskID:  1,
-		tasks:       nil,
-		taskIndices: make(map[string]int),
+		nextTaskID:     1,
+		tasks:          nil,
+		taskIndices:    make(map[string]int),
+		taskPageTokens: make(map[string]pageToken),
 
-		nextProjectID:  1,
-		projects:       nil,
-		projectIndices: make(map[string]int),
-
-		pageTokens: make(map[string]pageToken),
+		nextProjectID:     1,
+		projects:          nil,
+		projectIndices:    make(map[string]int),
+		projectPageTokens: make(map[string]pageToken),
 	}
 }
 
@@ -200,7 +200,7 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 
 	minIndex := 0
 	if token := req.GetPageToken(); token != "" {
-		pt, ok := f.pageTokens[token]
+		pt, ok := f.taskPageTokens[token]
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
 		}
@@ -208,7 +208,7 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
 		}
 		minIndex = pt.MinimumIndex
-		delete(f.pageTokens, token)
+		delete(f.taskPageTokens, token)
 	}
 
 	// Start adding tasks that we will return.
@@ -231,7 +231,7 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 
 		nextMinIndex := f.taskIndices[nextTask.GetName()]
 		token := uuid.NewString()
-		f.pageTokens[token] = pageToken{
+		f.taskPageTokens[token] = pageToken{
 			MinimumIndex: nextMinIndex,
 			ShowDeleted:  req.GetShowDeleted(),
 		}
@@ -560,6 +560,60 @@ func (f *Fake) GetProject(ctx context.Context, req *pb.GetProjectRequest) (*pb.P
 		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
 	}
 	return proto.Clone(project).(*pb.Project), nil
+}
+
+func (f *Fake) ListProjects(ctx context.Context, req *pb.ListProjectsRequest) (*pb.ListProjectsResponse, error) {
+	pageSize := req.GetPageSize()
+	if pageSize < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "The page size must not be negative; was %d.", pageSize)
+	}
+	if pageSize == 0 || pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	minIndex := 0
+	if token := req.GetPageToken(); token != "" {
+		pt, ok := f.projectPageTokens[token]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+		}
+		if req.GetShowDeleted() != pt.ShowDeleted {
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+		}
+		minIndex = pt.MinimumIndex
+		delete(f.projectPageTokens, token)
+	}
+
+	// Start adding projects that we will return.
+	res := &pb.ListProjectsResponse{}
+	for idx := minIndex; idx < len(f.projects) && len(res.GetProjects()) <= int(pageSize); idx++ {
+		project := f.projects[idx]
+		if expiry := project.GetExpireTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
+			continue
+		}
+		if project.GetDeleteTime().IsValid() && !req.GetShowDeleted() {
+			continue
+		}
+		res.Projects = append(res.GetProjects(), proto.Clone(project).(*pb.Project))
+	}
+
+	// If there is one extra project, use it to create a new page token.
+	if len(res.GetProjects()) == int(pageSize)+1 {
+		nextProject := res.GetProjects()[len(res.GetProjects())-1]
+		res.Projects = res.GetProjects()[:pageSize]
+
+		nextMinIndex := f.projectIndices[nextProject.GetName()]
+		token := uuid.NewString()
+		f.projectPageTokens[token] = pageToken{
+			MinimumIndex: nextMinIndex,
+			ShowDeleted:  req.GetShowDeleted(),
+		}
+		res.NextPageToken = token
+	}
+	return res, nil
 }
 
 // now returns time.Now() except if f.clock is non-nil, then that clock is used

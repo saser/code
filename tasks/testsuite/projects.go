@@ -143,7 +143,6 @@ func (s *Suite) TestGetProject_Error() {
 func (s *Suite) TestListProjects() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	want := s.client.CreateProjectsT(ctx, t, []*pb.Project{
 		{Title: "Buy milk"},
@@ -169,7 +168,6 @@ func (s *Suite) TestListProjects() {
 func (s *Suite) TestListProjects_MaxPageSize() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	projects := make([]*pb.Project, s.maxPageSize*2-s.maxPageSize/2)
 	for i := range projects {
@@ -201,7 +199,6 @@ func (s *Suite) TestListProjects_MaxPageSize() {
 func (s *Suite) TestListProjects_DifferentPageSizes() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	// 7 projects. Number chosen arbitrarily.
 	projects := s.client.CreateProjectsT(ctx, t, []*pb.Project{
@@ -226,7 +223,8 @@ func (s *Suite) TestListProjects_DifferentPageSizes() {
 		sizes := sizes
 		t.Run(fmt.Sprint(sizes), func(t *testing.T) {
 			// Sanity check: make sure the sizes add up to at least the number
-			// of projects, and that we won't try to get more pages after the last one.
+			// of projects, and that we won't try to get more pages after the
+			// last one.
 			{
 				sum := int32(0)
 				for i, s := range sizes {
@@ -417,7 +415,6 @@ func (s *Suite) TestListProjects_WithDeletions_ShowDeleted() {
 func (s *Suite) TestListProjects_WithAdditions() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	projects := s.client.CreateProjectsT(ctx, t, []*pb.Project{
 		{Title: "Buy milk"},
@@ -462,7 +459,6 @@ func (s *Suite) TestListProjects_WithAdditions() {
 func (s *Suite) TestListProjects_SamePageTokenTwice() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	projects := s.client.CreateProjectsT(ctx, t, []*pb.Project{
 		{Title: "Buy milk"},
@@ -508,7 +504,6 @@ func (s *Suite) TestListProjects_SamePageTokenTwice() {
 func (s *Suite) TestListProjects_ChangeRequestBetweenPages() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	projects := s.client.CreateProjectsT(ctx, t, []*pb.Project{
 		{Title: "Buy milk"},
@@ -554,7 +549,7 @@ func (s *Suite) TestListProjects_IncludesArchived() {
 	projects[0] = s.client.ArchiveProjectT(ctx, t, &pb.ArchiveProjectRequest{Name: projects[0].GetName()})
 
 	res := s.client.ListProjectsT(ctx, t, &pb.ListProjectsRequest{})
-	less := func(t1, t2 *pb.Project) bool { return t1.GetName() < t2.GetName() }
+	less := func(p1, p2 *pb.Project) bool { return p1.GetName() < p2.GetName() }
 	if diff := cmp.Diff(projects, res.GetProjects(), protocmp.Transform(), cmpopts.SortSlices(less)); diff != "" {
 		t.Fatalf("Unexpected diff when listing projects (-want +got)\n%s", diff)
 	}
@@ -563,7 +558,6 @@ func (s *Suite) TestListProjects_IncludesArchived() {
 func (s *Suite) TestListProjects_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 	for _, tt := range []struct {
 		name string
 		req  *pb.ListProjectsRequest

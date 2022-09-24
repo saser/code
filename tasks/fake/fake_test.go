@@ -72,14 +72,24 @@ type truncater struct {
 func (t *truncater) Truncate(ctx context.Context) error {
 	t.s.mu.Lock()
 	defer t.s.mu.Unlock()
+
 	t.s.tasks = []*pb.Task{}
-	for k := range t.s.pageTokens {
-		delete(t.s.pageTokens, k)
+	for k := range t.s.taskPageTokens {
+		delete(t.s.taskPageTokens, k)
 	}
 	for k := range t.s.taskIndices {
 		delete(t.s.taskIndices, k)
 	}
 	t.s.nextTaskID = 1
+
+	t.s.projects = []*pb.Project{}
+	for k := range t.s.projectPageTokens {
+		delete(t.s.projectPageTokens, k)
+	}
+	for k := range t.s.projectIndices {
+		delete(t.s.projectIndices, k)
+	}
+	t.s.nextProjectID = 1
 	return nil
 }
 
