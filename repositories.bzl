@@ -20,6 +20,12 @@ def go_repositories():
         sum = "h1:xK2lYat7ZLaVVcIuj82J8kIro4V6kDe0AUDFboUCwcg=",
         version = "v1.0.0",
     )
+    go_repository(
+        name = "com_github_atotto_clipboard",
+        importpath = "github.com/atotto/clipboard",
+        sum = "h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=",
+        version = "v0.1.4",
+    )
 
     go_repository(
         name = "com_github_azure_go_ansiterm",
@@ -75,10 +81,29 @@ def go_repositories():
         version = "v2.1.1",
     )
     go_repository(
+        name = "com_github_charmbracelet_bubbles",
+        importpath = "github.com/charmbracelet/bubbles",
+        sum = "h1:DJfCwnARfWjZLvMglhSQzo76UZ2gucuHPy9jLWX45Og=",
+        version = "v0.14.0",
+    )
+
+    go_repository(
         name = "com_github_charmbracelet_bubbletea",
         importpath = "github.com/charmbracelet/bubbletea",
         sum = "h1:z66q0LWdJNOWEH9zadiAIXp2GN1AWrwNXU8obVY9X24=",
         version = "v0.22.1",
+    )
+    go_repository(
+        name = "com_github_charmbracelet_harmonica",
+        importpath = "github.com/charmbracelet/harmonica",
+        sum = "h1:8NxJWRWg/bzKqqEaaeFNipOu77YR5t8aSwG4pgaUBiQ=",
+        version = "v0.2.0",
+    )
+    go_repository(
+        name = "com_github_charmbracelet_lipgloss",
+        importpath = "github.com/charmbracelet/lipgloss",
+        sum = "h1:lulQHuVeodSgDez+3rGiuxlPVXSnhth442DATR2/8t8=",
+        version = "v0.5.0",
     )
 
     go_repository(
@@ -436,6 +461,13 @@ def go_repositories():
         version = "v0.2.0",
     )
     go_repository(
+        name = "com_github_kylelemons_godebug",
+        importpath = "github.com/kylelemons/godebug",
+        sum = "h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=",
+        version = "v1.1.0",
+    )
+
+    go_repository(
         name = "com_github_lann_builder",
         importpath = "github.com/lann/builder",
         sum = "h1:SOEGU9fKiNWd/HOJuq6+3iTQz8KNCLtVX6idSoTLdUw=",
@@ -627,6 +659,12 @@ def go_repositories():
         importpath = "github.com/rs/zerolog",
         sum = "h1:uPRuwkWF4J6fGsJ2R0Gn2jB1EQiav9k3S6CSdygQJXY=",
         version = "v1.15.0",
+    )
+    go_repository(
+        name = "com_github_sahilm_fuzzy",
+        importpath = "github.com/sahilm/fuzzy",
+        sum = "h1:FzWGaw2Opqyu+794ZQ9SYifWv2EIXpwP4q8dY1kDAwI=",
+        version = "v0.1.0",
     )
 
     go_repository(

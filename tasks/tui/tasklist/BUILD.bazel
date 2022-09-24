@@ -1,13 +1,14 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
-    name = "root",
-    srcs = ["root.go"],
-    importpath = "go.saser.se/tasks/tui/root",
+    name = "tasklist",
+    srcs = ["tasklist.go"],
+    importpath = "go.saser.se/tasks/tui/tasklist",
     visibility = ["//visibility:public"],
     deps = [
         "//tasks/tasks_go_proto",
-        "//tasks/tui/tasklist",
+        "//tasks/tui/tasksclient",
+        "@com_github_charmbracelet_bubbles//list",
         "@com_github_charmbracelet_bubbletea//:bubbletea",
     ],
 )
