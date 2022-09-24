@@ -2,13 +2,13 @@ package dockertest
 
 import (
 	"context"
-	"net"
+	"net/http"
 	"testing"
 )
 
 const (
 	helloWorld = "docker/dockertest/hello_world_image.tar"
-	postgres   = "postgres/image.tar"
+	httpServer = "docker/dockertest/httpserver/httpserver_image.tar"
 )
 
 func TestLoad(t *testing.T) {
@@ -37,17 +37,21 @@ func TestAddress(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	opts := RunOptions{
-		Image: Load(ctx, t, postgres),
+		Image: Load(ctx, t, httpServer),
 	}
 	id := Run(ctx, t, opts)
-	addr := Address(ctx, t, id, "5432/tcp")
-	// We can't really assert much about the address, but we should be able to
-	// dial and connect to it.
-	conn, err := net.Dial("tcp", addr)
+	addr := Address(ctx, t, id, "8080/tcp")
+
+	// The HTTP server promises to serve something on the "/" path. We only care
+	// that we can make a request to it, and it returns 200 OK. We don't care
+	// about the actual response.
+	url := "http://" + addr + "/"
+	res, err := http.Get(url)
 	if err != nil {
-		t.Fatalf("net.Dial(_, %q) err = %v; want nil", addr, err)
+		t.Fatalf("http.Get(%q) err = %v; want nil", url, err)
 	}
-	if err := conn.Close(); err != nil {
-		t.Error(err)
+	defer res.Body.Close()
+	if got, want := res.StatusCode, http.StatusOK; got != want {
+		t.Fatalf("http.Get(%q) code = %v; want %v", url, got, want)
 	}
 }

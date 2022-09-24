@@ -27,7 +27,7 @@ go_test(
     srcs = ["dockertest_test.go"],
     data = [
         "hello_world_image.tar",
-        "//postgres:image.tar",
+        "//docker/dockertest/httpserver:httpserver_image.tar",
     ],
     embed = [":dockertest"],
 )
