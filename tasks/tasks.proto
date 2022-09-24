@@ -8,6 +8,10 @@ import "google/protobuf/timestamp.proto";
 option go_package = "go.saser.se/tasks/tasks_go_proto";
 
 service Tasks {
+    // =========================================================================
+    // Task methods.
+    // =========================================================================
+
     // Get a single task by name.
     rpc GetTask(GetTaskRequest) returns (Task);
 
@@ -33,9 +37,39 @@ service Tasks {
 
     // Mark a task as not completed.
     rpc UncompleteTask(UncompleteTaskRequest) returns (Task);
+
+    // =========================================================================
+    // Project methods.
+    // =========================================================================
+
+    // Get a single project by name.
+    rpc GetProject(GetProjectRequest) returns (Project);
+
+    // List projects.
+    rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+
+    // Create a new project.
+    rpc CreateProject(CreateProjectRequest) returns (Project);
+
+    // Update a single project.
+    rpc UpdateProject(UpdateProjectRequest) returns (Project);
+
+    // Soft delete a project by name. Soft deleted projects are still available
+    // for some time but will eventually be permanently deleted.
+    rpc DeleteProject(DeleteProjectRequest) returns (Project);
+
+    // Undeletes a previously soft deleted project. Can only be done as long as
+    // the project has not been permanently deleted.
+    rpc UndeleteProject(UndeleteProjectRequest) returns (Project);
+
+    // Marks a single project as archived.
+    rpc ArchiveProject(ArchiveProjectRequest) returns (Project);
+
+    // Marks a single project as active (i.e., not archived).
+    rpc UnarchiveProject(UnarchiveProjectRequest) returns (Project);
 }
 
-// A task is something that can be completed.
+// A task is a single action that can be completed.
 message Task {
     // The name of the task.
     // Format: tasks/{task}
@@ -71,6 +105,37 @@ message Task {
 
     // When the task will be permanently deleted after being soft deleted.
     google.protobuf.Timestamp expire_time = 10;
+}
+
+// A project is a container of tasks. Projects map to the GTD concept of a
+// project: something that requires more than one action to complete.
+message Project {
+    // The name.
+    // Format: projects/{project}
+    string name = 1;
+
+    // The title of the project. Must be a short string.
+    string title = 2;
+
+    // The description of the project. Can be a long string. Not all tasks have
+    // descriptions.
+    string description = 3;
+
+    // When the project was created.
+    google.protobuf.Timestamp create_time = 4;
+
+    // When the project was last updated, if ever.
+    google.protobuf.Timestamp update_time = 5;
+
+    // When the project was last soft deleted, if ever.
+    google.protobuf.Timestamp delete_time = 6;
+
+    // When the project will be permanently deleted after being soft deleted.
+    google.protobuf.Timestamp expire_time = 7;
+
+    // When the project was archived, if ever. If a project is archived and
+    // later unarchived this timestamp will be empty.
+    google.protobuf.Timestamp archive_time = 8;
 }
 
 message GetTaskRequest {
@@ -184,4 +249,74 @@ message UncompleteTaskRequest {
     // `undelete_descendants` or set it to false even if the task has
     // uncompleted descendants.
     bool uncomplete_descendants = 3;
+}
+
+message GetProjectRequest {
+    // The name.
+    // Format: projects/{project}
+    string name = 1;
+}
+
+message CreateProjectRequest {
+    // The project to be created. The `name` field will be ignored. The `title`
+    // field must not be empty.
+    Project project = 1;
+}
+
+message ListProjectsRequest {
+    // The standard page size. Optional. If unspecified, the server will choose
+    // a suitable default. Values larger than 1000 will be truncated to 1000.
+    int32 page_size = 1;
+
+    // The standard page token. Optional. Get the values from responses to
+    // ListProjects.
+    string page_token = 2;
+
+    // Whether soft deleted resources should be included in the response.
+    bool show_deleted = 3;
+}
+
+message ListProjectsResponse {
+    // The projects.
+    repeated Project projects = 1;
+
+    // The token required to get the next page in a subsequent call to
+    // ListProjects.
+    string next_page_token = 2;
+}
+
+message UpdateProjectRequest {
+    // The project to be updated. The `name` field is used to specify which
+    // project to update. Only fields with non-default values will be updated,
+    // as long as they are specified in `update_mask`.
+    Project project = 1;
+
+    // A field mask of which fields to update. A nil or empty field mask will be
+    // interpreted as updating all fields specified in `project`. Specifying a
+    // single `*` means doing a full replacement of the project.
+    google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteProjectRequest {
+    // The name.
+    // Format: projects/{project}
+    string name = 1;
+}
+
+message UndeleteProjectRequest {
+    // The name.
+    // Format: projects/{project}
+    string name = 1;
+}
+
+message ArchiveProjectRequest {
+    // The name.
+    // Format: projects/{project}
+    string name = 1;
+}
+
+message UnarchiveProjectRequest {
+    // The name.
+    // Format: projects/{project}
+    string name = 1;
 }

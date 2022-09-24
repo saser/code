@@ -41,6 +41,24 @@ type TasksClient interface {
 	CompleteTask(ctx context.Context, in *CompleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
 	// Mark a task as not completed.
 	UncompleteTask(ctx context.Context, in *UncompleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Get a single project by name.
+	GetProject(ctx context.Context, in *GetProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	// List projects.
+	ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error)
+	// Create a new project.
+	CreateProject(ctx context.Context, in *CreateProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	// Update a single project.
+	UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	// Soft delete a project by name. Soft deleted projects are still available
+	// for some time but will eventually be permanently deleted.
+	DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	// Undeletes a previously soft deleted project. Can only be done as long as
+	// the project has not been permanently deleted.
+	UndeleteProject(ctx context.Context, in *UndeleteProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	// Marks a single project as archived.
+	ArchiveProject(ctx context.Context, in *ArchiveProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	// Marks a single project as active (i.e., not archived).
+	UnarchiveProject(ctx context.Context, in *UnarchiveProjectRequest, opts ...grpc.CallOption) (*Project, error)
 }
 
 type tasksClient struct {
@@ -123,6 +141,78 @@ func (c *tasksClient) UncompleteTask(ctx context.Context, in *UncompleteTaskRequ
 	return out, nil
 }
 
+func (c *tasksClient) GetProject(ctx context.Context, in *GetProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	out := new(Project)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/GetProject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error) {
+	out := new(ListProjectsResponse)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/ListProjects", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) CreateProject(ctx context.Context, in *CreateProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	out := new(Project)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/CreateProject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	out := new(Project)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/UpdateProject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	out := new(Project)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/DeleteProject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) UndeleteProject(ctx context.Context, in *UndeleteProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	out := new(Project)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/UndeleteProject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) ArchiveProject(ctx context.Context, in *ArchiveProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	out := new(Project)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/ArchiveProject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) UnarchiveProject(ctx context.Context, in *UnarchiveProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	out := new(Project)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/UnarchiveProject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TasksServer is the server API for Tasks service.
 // All implementations must embed UnimplementedTasksServer
 // for forward compatibility
@@ -145,6 +235,24 @@ type TasksServer interface {
 	CompleteTask(context.Context, *CompleteTaskRequest) (*Task, error)
 	// Mark a task as not completed.
 	UncompleteTask(context.Context, *UncompleteTaskRequest) (*Task, error)
+	// Get a single project by name.
+	GetProject(context.Context, *GetProjectRequest) (*Project, error)
+	// List projects.
+	ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error)
+	// Create a new project.
+	CreateProject(context.Context, *CreateProjectRequest) (*Project, error)
+	// Update a single project.
+	UpdateProject(context.Context, *UpdateProjectRequest) (*Project, error)
+	// Soft delete a project by name. Soft deleted projects are still available
+	// for some time but will eventually be permanently deleted.
+	DeleteProject(context.Context, *DeleteProjectRequest) (*Project, error)
+	// Undeletes a previously soft deleted project. Can only be done as long as
+	// the project has not been permanently deleted.
+	UndeleteProject(context.Context, *UndeleteProjectRequest) (*Project, error)
+	// Marks a single project as archived.
+	ArchiveProject(context.Context, *ArchiveProjectRequest) (*Project, error)
+	// Marks a single project as active (i.e., not archived).
+	UnarchiveProject(context.Context, *UnarchiveProjectRequest) (*Project, error)
 	mustEmbedUnimplementedTasksServer()
 }
 
@@ -181,6 +289,38 @@ func (UnimplementedTasksServer) CompleteTask(context.Context, *CompleteTaskReque
 
 func (UnimplementedTasksServer) UncompleteTask(context.Context, *UncompleteTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UncompleteTask not implemented")
+}
+
+func (UnimplementedTasksServer) GetProject(context.Context, *GetProjectRequest) (*Project, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProject not implemented")
+}
+
+func (UnimplementedTasksServer) ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListProjects not implemented")
+}
+
+func (UnimplementedTasksServer) CreateProject(context.Context, *CreateProjectRequest) (*Project, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateProject not implemented")
+}
+
+func (UnimplementedTasksServer) UpdateProject(context.Context, *UpdateProjectRequest) (*Project, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateProject not implemented")
+}
+
+func (UnimplementedTasksServer) DeleteProject(context.Context, *DeleteProjectRequest) (*Project, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteProject not implemented")
+}
+
+func (UnimplementedTasksServer) UndeleteProject(context.Context, *UndeleteProjectRequest) (*Project, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UndeleteProject not implemented")
+}
+
+func (UnimplementedTasksServer) ArchiveProject(context.Context, *ArchiveProjectRequest) (*Project, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveProject not implemented")
+}
+
+func (UnimplementedTasksServer) UnarchiveProject(context.Context, *UnarchiveProjectRequest) (*Project, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnarchiveProject not implemented")
 }
 func (UnimplementedTasksServer) mustEmbedUnimplementedTasksServer() {}
 
@@ -339,6 +479,150 @@ func _Tasks_UncompleteTask_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Tasks_GetProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).GetProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/GetProject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).GetProject(ctx, req.(*GetProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_ListProjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProjectsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).ListProjects(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/ListProjects",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).ListProjects(ctx, req.(*ListProjectsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_CreateProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).CreateProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/CreateProject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).CreateProject(ctx, req.(*CreateProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_UpdateProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).UpdateProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/UpdateProject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).UpdateProject(ctx, req.(*UpdateProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_DeleteProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).DeleteProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/DeleteProject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).DeleteProject(ctx, req.(*DeleteProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_UndeleteProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UndeleteProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).UndeleteProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/UndeleteProject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).UndeleteProject(ctx, req.(*UndeleteProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_ArchiveProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).ArchiveProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/ArchiveProject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).ArchiveProject(ctx, req.(*ArchiveProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_UnarchiveProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnarchiveProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).UnarchiveProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/UnarchiveProject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).UnarchiveProject(ctx, req.(*UnarchiveProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Tasks_ServiceDesc is the grpc.ServiceDesc for Tasks service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -377,6 +661,38 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UncompleteTask",
 			Handler:    _Tasks_UncompleteTask_Handler,
+		},
+		{
+			MethodName: "GetProject",
+			Handler:    _Tasks_GetProject_Handler,
+		},
+		{
+			MethodName: "ListProjects",
+			Handler:    _Tasks_ListProjects_Handler,
+		},
+		{
+			MethodName: "CreateProject",
+			Handler:    _Tasks_CreateProject_Handler,
+		},
+		{
+			MethodName: "UpdateProject",
+			Handler:    _Tasks_UpdateProject_Handler,
+		},
+		{
+			MethodName: "DeleteProject",
+			Handler:    _Tasks_DeleteProject_Handler,
+		},
+		{
+			MethodName: "UndeleteProject",
+			Handler:    _Tasks_UndeleteProject_Handler,
+		},
+		{
+			MethodName: "ArchiveProject",
+			Handler:    _Tasks_ArchiveProject_Handler,
+		},
+		{
+			MethodName: "UnarchiveProject",
+			Handler:    _Tasks_UnarchiveProject_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
