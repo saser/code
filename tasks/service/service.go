@@ -921,6 +921,51 @@ func (s *Service) CreateProject(ctx context.Context, req *pb.CreateProjectReques
 	return project, nil
 }
 
+func (s *Service) GetProject(ctx context.Context, req *pb.GetProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if !strings.HasPrefix(name, "projects/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+	resourceID := strings.TrimPrefix(name, "projects/")
+	if resourceID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project does not contain a resource ID after "projects/".`)
+	}
+	id, err := strconv.ParseInt(resourceID, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	var (
+		project *pb.Project
+		now     time.Time
+	)
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		var err error
+		now, err = s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		t, err := queryProjectByID(ctx, tx, id, true /*showDeleted*/)
+		if err != nil {
+			return err
+		}
+		project = t
+		return nil
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	if expire := project.GetExpireTime(); expire.IsValid() && now.After(expire.AsTime()) {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	return project, nil
+}
+
 // queryDescendantIDs returns the IDs of all tasks descending, directly or
 // transitively, from rootID. Note that rootID is itself not included in the
 // resulting slice. If showDeleted is true, IDs from deleted descendant tasks
@@ -989,10 +1034,10 @@ func queryAncestorIDs(ctx context.Context, tx pgx.Tx, leafID int64, showDeleted 
 	return ids, nil
 }
 
-// queryTaskByID the database within the given transaction for the task with the
-// given ID. Any errors from database driver is returned. For example, if no
-// task is found by the given ID, pgx.ErrNoRows is returned, and callers should
-// check for it using errors.Is.
+// queryTaskByID queries the database within the given transaction for the task
+// with the given ID. Any errors from database driver is returned. For example,
+// if no task is found by the given ID, pgx.ErrNoRows is returned, and callers
+// should check for it using errors.Is.
 func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (*pb.Task, error) {
 	task := &pb.Task{
 		Name: "tasks/" + fmt.Sprint(id),
@@ -1056,6 +1101,68 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 		task.UpdateTime = timestamppb.New(updateTime.Time)
 	}
 	return task, nil
+}
+
+// queryProjectByID queries the database within the given transaction for the
+// project with the given ID. Any errors from database driver is returned. For
+// example, if no project is found by the given ID, pgx.ErrNoRows is returned, and
+// callers should check for it using errors.Is.
+func queryProjectByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (*pb.Project, error) {
+	project := &pb.Project{
+		Name: "projects/" + fmt.Sprint(id),
+	}
+	var archiveTime pgtype.Timestamptz
+	var createTime time.Time
+	var deleteTime, expireTime, updateTime pgtype.Timestamptz
+	st := postgres.StatementBuilder.
+		Select(
+			"title",
+			"description",
+			"archive_time",
+			"create_time",
+			"update_time",
+			"delete_time",
+			"expire_time",
+		)
+
+	from := "existing_projects"
+	if showDeleted {
+		from = "projects"
+	}
+	st = st.
+		From(from).
+		Where(squirrel.Eq{
+			"id": id,
+		})
+	sql, args, err := st.ToSql()
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.QueryRow(ctx, sql, args...).Scan(
+		&project.Title,
+		&project.Description,
+		&archiveTime,
+		&createTime,
+		&updateTime,
+		&deleteTime,
+		&expireTime,
+	); err != nil {
+		return nil, err
+	}
+	if archiveTime.Status == pgtype.Present {
+		project.ArchiveTime = timestamppb.New(archiveTime.Time)
+	}
+	project.CreateTime = timestamppb.New(createTime)
+	if deleteTime.Status == pgtype.Present {
+		project.DeleteTime = timestamppb.New(deleteTime.Time)
+	}
+	if expireTime.Status == pgtype.Present {
+		project.ExpireTime = timestamppb.New(expireTime.Time)
+	}
+	if updateTime.Status == pgtype.Present {
+		project.UpdateTime = timestamppb.New(updateTime.Time)
+	}
+	return project, nil
 }
 
 func (s *Service) now(ctx context.Context, tx pgx.Tx) (time.Time, error) {

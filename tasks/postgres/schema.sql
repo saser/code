@@ -61,6 +61,15 @@ CREATE VIEW existing_tasks AS (
     WHERE delete_time IS NULL
 );
 
+-- In many cases we want to run queries over existing projects only. This view
+-- is a convenient way to do that, compared to having to remember to filter out
+-- deleted projects yourself.
+CREATE VIEW existing_projects AS (
+    SELECT *
+    FROM projects
+    WHERE delete_time IS NULL
+);
+
 -- This view contains a mapping from parent task ID to child task ID. Tasks
 -- without any children are not included as parents in this view.
 CREATE VIEW tasks_children AS (

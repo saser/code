@@ -103,6 +103,24 @@ func validateTaskName(name string) error {
 	return nil
 }
 
+// validateProjectName returns an error if name isn't a valid task name.
+func validateProjectName(name string) error {
+	const prefix = "projects/"
+	if !strings.HasPrefix(name, prefix) {
+		return &invalidNameError{
+			Name:   name,
+			Reason: fmt.Sprintf("name doesn't have prefix %q", prefix),
+		}
+	}
+	if id := strings.TrimPrefix(name, prefix); id == "" {
+		return &invalidNameError{
+			Name:   name,
+			Reason: fmt.Sprintf("name doesn't have a resource ID after %q", prefix),
+		}
+	}
+	return nil
+}
+
 // childIndices returns indices into f.tasks for all tasks that are direct
 // children to the task named parent. Note that this does not include parent
 // itself, nor any transitive children.
@@ -519,6 +537,29 @@ func (f *Fake) CreateProject(ctx context.Context, req *pb.CreateProjectRequest) 
 	f.projects = append(f.projects, created)
 	f.projectIndices[created.Name] = len(f.projects) - 1
 	return created, nil
+}
+
+func (f *Fake) GetProject(ctx context.Context, req *pb.GetProjectRequest) (*pb.Project, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the project is required.")
+	}
+	if err := validateProjectName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the project must have format "projects/{project}", but it was %q.`, name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.projectIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	project := f.projects[idx]
+	if expire := project.GetExpireTime(); expire.IsValid() && f.now().After(expire.AsTime()) {
+		return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", name)
+	}
+	return proto.Clone(project).(*pb.Project), nil
 }
 
 // now returns time.Now() except if f.clock is non-nil, then that clock is used

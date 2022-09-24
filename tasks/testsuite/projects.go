@@ -19,7 +19,6 @@ import (
 func (s *Suite) TestGetProject() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 
 	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
@@ -94,7 +93,6 @@ func (s *Suite) TestGetProject_AfterDeletion() {
 func (s *Suite) TestGetProject_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.SkipNow()
 	for _, tt := range []struct {
 		name string
 		req  *pb.GetProjectRequest
