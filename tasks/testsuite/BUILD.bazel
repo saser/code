@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "client.go",
         "doc.go",
+        "projects.go",
         "tasks.go",
         "testsuite.go",
     ],
