@@ -936,7 +936,7 @@ func (s *Suite) TestUpdateTask() {
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			// We need to reset the time to creatTime.
+			// We need to reset the time to createTime.
 			// We want to find `d` such that `now + d = createTime.`
 			// Therefore `d = createTime - now.`
 			s.clock.Advance(createTime.Sub(s.clock.Now()))
