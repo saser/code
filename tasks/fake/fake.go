@@ -225,7 +225,7 @@ func (f *Fake) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.Lis
 	res := &pb.ListTasksResponse{}
 	for idx := minIndex; idx < len(f.tasks) && len(res.GetTasks()) <= int(pageSize); idx++ {
 		task := f.tasks[idx]
-		if expiry := task.GetExpireTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
+		if expire := task.GetExpireTime(); expire.IsValid() && f.now().After(expire.AsTime()) {
 			continue
 		}
 		if task.GetDeleteTime().IsValid() && !req.GetShowDeleted() {
@@ -582,7 +582,7 @@ func (f *Fake) ListProjects(ctx context.Context, req *pb.ListProjectsRequest) (*
 	res := &pb.ListProjectsResponse{}
 	for idx := minIndex; idx < len(f.projects) && len(res.GetProjects()) <= int(pageSize); idx++ {
 		project := f.projects[idx]
-		if expiry := project.GetExpireTime(); expiry.IsValid() && f.now().After(expiry.AsTime()) {
+		if expire := project.GetExpireTime(); expire.IsValid() && f.now().After(expire.AsTime()) {
 			continue
 		}
 		if project.GetDeleteTime().IsValid() && !req.GetShowDeleted() {

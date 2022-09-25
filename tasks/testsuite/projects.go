@@ -1093,8 +1093,8 @@ func (s *Suite) TestDeleteProject() {
 		if err := deleted.GetExpireTime().CheckValid(); err != nil {
 			t.Errorf("first deletion: expire_time is invalid: %v", err)
 		}
-		if delete, expiry := deleted.GetDeleteTime().AsTime(), deleted.GetExpireTime().AsTime(); expiry.Before(delete) {
-			t.Errorf("first deletion: delete_time = %v; wanted before expire_time = %v", delete, expiry)
+		if delete, expire := deleted.GetDeleteTime().AsTime(), deleted.GetExpireTime().AsTime(); expire.Before(delete) {
+			t.Errorf("first deletion: delete_time = %v; wanted before expire_time = %v", delete, expire)
 		}
 	}
 
