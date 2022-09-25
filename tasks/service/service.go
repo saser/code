@@ -894,48 +894,6 @@ func (s *Service) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequ
 	return task, nil
 }
 
-func (s *Service) CreateProject(ctx context.Context, req *pb.CreateProjectRequest) (*pb.Project, error) {
-	project := req.GetProject()
-	if project.GetTitle() == "" {
-		return nil, status.Error(codes.InvalidArgument, "The project must have a title.")
-	}
-	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
-		now, err := s.now(ctx, tx)
-		if err != nil {
-			return err
-		}
-		sql, args, err := postgres.StatementBuilder.
-			Insert("projects").
-			SetMap(map[string]interface{}{
-				"title":       project.GetTitle(),
-				"description": project.GetDescription(),
-				"create_time": now,
-			}).
-			Suffix("RETURNING id, create_time").
-			ToSql()
-		if err != nil {
-			return err
-		}
-		var (
-			id         int64
-			createTime time.Time
-		)
-		if err := tx.QueryRow(ctx, sql, args...).Scan(
-			&id,
-			&createTime,
-		); err != nil {
-			return err
-		}
-		project.Name = "projects/" + fmt.Sprint(id)
-		project.CreateTime = timestamppb.New(createTime)
-		return nil
-	}); err != nil {
-		klog.Error(err)
-		return nil, internalError
-	}
-	return project, nil
-}
-
 func (s *Service) GetProject(ctx context.Context, req *pb.GetProjectRequest) (*pb.Project, error) {
 	name := req.GetName()
 	if name == "" {
@@ -1168,6 +1126,48 @@ func (s *Service) ListProjects(ctx context.Context, req *pb.ListProjectsRequest)
 		return nil, internalError
 	}
 	return res, nil
+}
+
+func (s *Service) CreateProject(ctx context.Context, req *pb.CreateProjectRequest) (*pb.Project, error) {
+	project := req.GetProject()
+	if project.GetTitle() == "" {
+		return nil, status.Error(codes.InvalidArgument, "The project must have a title.")
+	}
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		now, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		sql, args, err := postgres.StatementBuilder.
+			Insert("projects").
+			SetMap(map[string]interface{}{
+				"title":       project.GetTitle(),
+				"description": project.GetDescription(),
+				"create_time": now,
+			}).
+			Suffix("RETURNING id, create_time").
+			ToSql()
+		if err != nil {
+			return err
+		}
+		var (
+			id         int64
+			createTime time.Time
+		)
+		if err := tx.QueryRow(ctx, sql, args...).Scan(
+			&id,
+			&createTime,
+		); err != nil {
+			return err
+		}
+		project.Name = "projects/" + fmt.Sprint(id)
+		project.CreateTime = timestamppb.New(createTime)
+		return nil
+	}); err != nil {
+		klog.Error(err)
+		return nil, internalError
+	}
+	return project, nil
 }
 
 func (s *Service) UpdateProject(ctx context.Context, req *pb.UpdateProjectRequest) (*pb.Project, error) {

@@ -535,25 +535,6 @@ func (f *Fake) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequest
 	return proto.Clone(task).(*pb.Task), nil
 }
 
-func (f *Fake) CreateProject(ctx context.Context, req *pb.CreateProjectRequest) (*pb.Project, error) {
-	project := req.GetProject()
-	if project.GetTitle() == "" {
-		return nil, status.Error(codes.InvalidArgument, "The project must have a title.")
-	}
-
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	created := proto.Clone(project).(*pb.Project)
-	id := f.nextProjectID
-	f.nextProjectID++
-	created.Name = "projects/" + fmt.Sprint(id)
-	created.CreateTime = timestamppb.New(f.now())
-	f.projects = append(f.projects, created)
-	f.projectIndices[created.Name] = len(f.projects) - 1
-	return created, nil
-}
-
 func (f *Fake) GetProject(ctx context.Context, req *pb.GetProjectRequest) (*pb.Project, error) {
 	name := req.GetName()
 	if name == "" {
@@ -629,6 +610,25 @@ func (f *Fake) ListProjects(ctx context.Context, req *pb.ListProjectsRequest) (*
 		res.NextPageToken = token
 	}
 	return res, nil
+}
+
+func (f *Fake) CreateProject(ctx context.Context, req *pb.CreateProjectRequest) (*pb.Project, error) {
+	project := req.GetProject()
+	if project.GetTitle() == "" {
+		return nil, status.Error(codes.InvalidArgument, "The project must have a title.")
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	created := proto.Clone(project).(*pb.Project)
+	id := f.nextProjectID
+	f.nextProjectID++
+	created.Name = "projects/" + fmt.Sprint(id)
+	created.CreateTime = timestamppb.New(f.now())
+	f.projects = append(f.projects, created)
+	f.projectIndices[created.Name] = len(f.projects) - 1
+	return created, nil
 }
 
 func (f *Fake) UpdateProject(ctx context.Context, req *pb.UpdateProjectRequest) (*pb.Project, error) {
