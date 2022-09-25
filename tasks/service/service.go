@@ -353,18 +353,14 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 			Insert("tasks").
 			Columns(columns...).
 			Values(values...).
-			Suffix("RETURNING id, create_time").
+			Suffix("RETURNING id").
 			ToSql()
 		if err != nil {
 			return err
 		}
-		var (
-			id         int64
-			createTime time.Time
-		)
+		var id int64
 		if err := tx.QueryRow(ctx, sql, args...).Scan(
 			&id,
-			&createTime,
 		); err != nil {
 			if e := (*pgconn.PgError)(nil); errors.As(err, &e) {
 				if e.Code != pgerrcode.ForeignKeyViolation {
@@ -378,7 +374,7 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 			return err
 		}
 		task.Name = "tasks/" + fmt.Sprint(id)
-		task.CreateTime = timestamppb.New(createTime)
+		task.CreateTime = timestamppb.New(now)
 		return nil
 	}); err != nil {
 		if errors.Is(err, errParentNotFound) {
@@ -1145,23 +1141,19 @@ func (s *Service) CreateProject(ctx context.Context, req *pb.CreateProjectReques
 				"description": project.GetDescription(),
 				"create_time": now,
 			}).
-			Suffix("RETURNING id, create_time").
+			Suffix("RETURNING id").
 			ToSql()
 		if err != nil {
 			return err
 		}
-		var (
-			id         int64
-			createTime time.Time
-		)
+		var id int64
 		if err := tx.QueryRow(ctx, sql, args...).Scan(
 			&id,
-			&createTime,
 		); err != nil {
 			return err
 		}
 		project.Name = "projects/" + fmt.Sprint(id)
-		project.CreateTime = timestamppb.New(createTime)
+		project.CreateTime = timestamppb.New(now)
 		return nil
 	}); err != nil {
 		klog.Error(err)
