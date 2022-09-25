@@ -343,16 +343,17 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 		if err != nil {
 			return err
 		}
-		columns := []string{"title", "description", "create_time"}
-		values := []interface{}{task.GetTitle(), task.GetDescription(), now}
+		set := map[string]interface{}{
+			"title":       task.GetTitle(),
+			"description": task.GetDescription(),
+			"create_time": now,
+		}
 		if parentID != -1 {
-			columns = append(columns, "parent")
-			values = append(values, parentID)
+			set["parent"] = parentID
 		}
 		sql, args, err := postgres.StatementBuilder.
 			Insert("tasks").
-			Columns(columns...).
-			Values(values...).
+			SetMap(set).
 			Suffix("RETURNING id").
 			ToSql()
 		if err != nil {
