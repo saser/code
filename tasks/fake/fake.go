@@ -26,11 +26,6 @@ import (
 // (at most) maxPageSize tasks.
 const maxPageSize = 1000
 
-// internalError should be returned whenever something goes wrong with serving a
-// request, and where the error cannot be attributed to the user making an
-// invalid request, something cannot be found, etc.
-var internalError = status.Error(codes.Internal, "Something went wrong.")
-
 // taskUpdatableMask contains the fields that can be updated by UpdateTask. It must
 // be kept in sync with the proto definition.
 var taskUpdatableMask *fieldmaskpb.FieldMask
@@ -384,7 +379,7 @@ func (f *Fake) DeleteTask(ctx context.Context, req *pb.DeleteTaskRequest) (*pb.T
 		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
 	}
 	descendantIndices := f.descendantIndices(name)
-	if len(descendantIndices) > 0 && req.GetForce() == false {
+	if len(descendantIndices) > 0 && !req.GetForce() {
 		return nil, status.Errorf(codes.FailedPrecondition, "Task %q has children; not deleting without `force: true`.", name)
 	}
 	now := f.now()
