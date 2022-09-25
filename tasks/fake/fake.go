@@ -574,10 +574,10 @@ func (f *Fake) ListProjects(ctx context.Context, req *pb.ListProjectsRequest) (*
 	if token := req.GetPageToken(); token != "" {
 		pt, ok := f.projectPageTokens[token]
 		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", token)
 		}
 		if req.GetShowDeleted() != pt.ShowDeleted {
-			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", token)
 		}
 		minIndex = pt.MinimumIndex
 		delete(f.projectPageTokens, token)
