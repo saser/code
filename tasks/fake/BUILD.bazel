@@ -26,6 +26,7 @@ go_test(
     srcs = ["fake_test.go"],
     embed = [":fake"],
     deps = [
+        "//grpctest",
         "//tasks/tasks_go_proto",
         "//tasks/testsuite",
         "@com_github_jonboulle_clockwork//:clockwork",

@@ -30,6 +30,7 @@ go_test(
     data = ["//tasks/postgres:schema.sql"],
     embed = [":service"],
     deps = [
+        "//grpctest",
         "//postgres",
         "//postgres/postgrestest",
         "//tasks/tasks_go_proto",
