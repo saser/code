@@ -59,6 +59,16 @@ type TasksClient interface {
 	ArchiveProject(ctx context.Context, in *ArchiveProjectRequest, opts ...grpc.CallOption) (*Project, error)
 	// Marks a single project as active (i.e., not archived).
 	UnarchiveProject(ctx context.Context, in *UnarchiveProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	// Get a single label by name.
+	GetLabel(ctx context.Context, in *GetLabelRequest, opts ...grpc.CallOption) (*Label, error)
+	// List labels.
+	ListLabels(ctx context.Context, in *ListLabelsRequest, opts ...grpc.CallOption) (*ListLabelsResponse, error)
+	// Create a new label.
+	CreateLabel(ctx context.Context, in *CreateLabelRequest, opts ...grpc.CallOption) (*Label, error)
+	// Update a single label.
+	UpdateLabel(ctx context.Context, in *UpdateLabelRequest, opts ...grpc.CallOption) (*Label, error)
+	// Delete a single label. This operation cannot be undone.
+	DeleteLabel(ctx context.Context, in *DeleteLabelRequest, opts ...grpc.CallOption) (*Label, error)
 }
 
 type tasksClient struct {
@@ -213,6 +223,51 @@ func (c *tasksClient) UnarchiveProject(ctx context.Context, in *UnarchiveProject
 	return out, nil
 }
 
+func (c *tasksClient) GetLabel(ctx context.Context, in *GetLabelRequest, opts ...grpc.CallOption) (*Label, error) {
+	out := new(Label)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/GetLabel", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) ListLabels(ctx context.Context, in *ListLabelsRequest, opts ...grpc.CallOption) (*ListLabelsResponse, error) {
+	out := new(ListLabelsResponse)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/ListLabels", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) CreateLabel(ctx context.Context, in *CreateLabelRequest, opts ...grpc.CallOption) (*Label, error) {
+	out := new(Label)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/CreateLabel", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) UpdateLabel(ctx context.Context, in *UpdateLabelRequest, opts ...grpc.CallOption) (*Label, error) {
+	out := new(Label)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/UpdateLabel", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) DeleteLabel(ctx context.Context, in *DeleteLabelRequest, opts ...grpc.CallOption) (*Label, error) {
+	out := new(Label)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/DeleteLabel", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TasksServer is the server API for Tasks service.
 // All implementations must embed UnimplementedTasksServer
 // for forward compatibility
@@ -253,6 +308,16 @@ type TasksServer interface {
 	ArchiveProject(context.Context, *ArchiveProjectRequest) (*Project, error)
 	// Marks a single project as active (i.e., not archived).
 	UnarchiveProject(context.Context, *UnarchiveProjectRequest) (*Project, error)
+	// Get a single label by name.
+	GetLabel(context.Context, *GetLabelRequest) (*Label, error)
+	// List labels.
+	ListLabels(context.Context, *ListLabelsRequest) (*ListLabelsResponse, error)
+	// Create a new label.
+	CreateLabel(context.Context, *CreateLabelRequest) (*Label, error)
+	// Update a single label.
+	UpdateLabel(context.Context, *UpdateLabelRequest) (*Label, error)
+	// Delete a single label. This operation cannot be undone.
+	DeleteLabel(context.Context, *DeleteLabelRequest) (*Label, error)
 	mustEmbedUnimplementedTasksServer()
 }
 
@@ -321,6 +386,26 @@ func (UnimplementedTasksServer) ArchiveProject(context.Context, *ArchiveProjectR
 
 func (UnimplementedTasksServer) UnarchiveProject(context.Context, *UnarchiveProjectRequest) (*Project, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnarchiveProject not implemented")
+}
+
+func (UnimplementedTasksServer) GetLabel(context.Context, *GetLabelRequest) (*Label, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLabel not implemented")
+}
+
+func (UnimplementedTasksServer) ListLabels(context.Context, *ListLabelsRequest) (*ListLabelsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListLabels not implemented")
+}
+
+func (UnimplementedTasksServer) CreateLabel(context.Context, *CreateLabelRequest) (*Label, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateLabel not implemented")
+}
+
+func (UnimplementedTasksServer) UpdateLabel(context.Context, *UpdateLabelRequest) (*Label, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateLabel not implemented")
+}
+
+func (UnimplementedTasksServer) DeleteLabel(context.Context, *DeleteLabelRequest) (*Label, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteLabel not implemented")
 }
 func (UnimplementedTasksServer) mustEmbedUnimplementedTasksServer() {}
 
@@ -623,6 +708,96 @@ func _Tasks_UnarchiveProject_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Tasks_GetLabel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLabelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).GetLabel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/GetLabel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).GetLabel(ctx, req.(*GetLabelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_ListLabels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListLabelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).ListLabels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/ListLabels",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).ListLabels(ctx, req.(*ListLabelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_CreateLabel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateLabelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).CreateLabel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/CreateLabel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).CreateLabel(ctx, req.(*CreateLabelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_UpdateLabel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateLabelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).UpdateLabel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/UpdateLabel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).UpdateLabel(ctx, req.(*UpdateLabelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_DeleteLabel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteLabelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).DeleteLabel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/DeleteLabel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).DeleteLabel(ctx, req.(*DeleteLabelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Tasks_ServiceDesc is the grpc.ServiceDesc for Tasks service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -693,6 +868,26 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UnarchiveProject",
 			Handler:    _Tasks_UnarchiveProject_Handler,
+		},
+		{
+			MethodName: "GetLabel",
+			Handler:    _Tasks_GetLabel_Handler,
+		},
+		{
+			MethodName: "ListLabels",
+			Handler:    _Tasks_ListLabels_Handler,
+		},
+		{
+			MethodName: "CreateLabel",
+			Handler:    _Tasks_CreateLabel_Handler,
+		},
+		{
+			MethodName: "UpdateLabel",
+			Handler:    _Tasks_UpdateLabel_Handler,
+		},
+		{
+			MethodName: "DeleteLabel",
+			Handler:    _Tasks_DeleteLabel_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

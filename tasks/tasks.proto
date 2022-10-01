@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package tasks;
 
+import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -67,6 +68,25 @@ service Tasks {
 
     // Marks a single project as active (i.e., not archived).
     rpc UnarchiveProject(UnarchiveProjectRequest) returns (Project);
+
+    // =========================================================================
+    // Label methods.
+    // =========================================================================
+
+    // Get a single label by name.
+    rpc GetLabel(GetLabelRequest) returns (Label);
+
+    // List labels.
+    rpc ListLabels(ListLabelsRequest) returns (ListLabelsResponse);
+
+    // Create a new label.
+    rpc CreateLabel(CreateLabelRequest) returns (Label);
+
+    // Update a single label.
+    rpc UpdateLabel(UpdateLabelRequest) returns (Label);
+
+    // Delete a single label. This operation cannot be undone.
+    rpc DeleteLabel(DeleteLabelRequest) returns (google.protobuf.Empty);
 }
 
 // A task is a single action that can be completed.
@@ -133,6 +153,32 @@ message Project {
     // When the project was archived, if ever. If a project is archived and
     // later unarchived this timestamp will be empty.
     google.protobuf.Timestamp archive_time = 8;
+}
+
+// A label can be attached to tasks (not projects) to allow for some flexibility
+// in organizing and listing tasks. Attaching a label to a task carries no
+// semantic meaning otherwise.
+message Label {
+    // The resource name.
+    // Format: labels/{label}
+    string name = 1;
+
+    // The actual label string used by humans. Must be unique. It should be
+    // non-empty, short, and is only allowed to contain:
+    // * alphanumeric characters (a-z, A-Z, 0-9)
+    // * certain special characters: ':', '-', '_', '@'
+    //
+    // Examples:
+    // * email
+    // * Agendas:Boss
+    // * online_work
+    string label = 2;
+
+    // When the label was created.
+    google.protobuf.Timestamp create_time = 3;
+
+    // When the label was last updated, if ever.
+    google.protobuf.Timestamp update_time = 4;
 }
 
 message GetTaskRequest {
@@ -315,5 +361,54 @@ message ArchiveProjectRequest {
 message UnarchiveProjectRequest {
     // The name.
     // Format: projects/{project}
+    string name = 1;
+}
+
+message GetLabelRequest {
+    // The name.
+    // Format: labels/{label}
+    string name = 1;
+}
+
+message CreateLabelRequest {
+    // The label to be created. The `name` field will be ignored. The `label`
+    // field must not be empty.
+    Label label = 1;
+}
+
+message ListLabelsRequest {
+    // The standard page size. Optional. If unspecified, the server will choose
+    // a suitable default. Values larger than 1000 will be truncated to 1000.
+    int32 page_size = 1;
+
+    // The standard page token. Optional. Get the values from responses to
+    // ListLabels.
+    string page_token = 2;
+}
+
+message ListLabelsResponse {
+    // The labels.
+    repeated Label labels = 1;
+
+    // The token required to get the next page in a subsequent call to
+    // ListLabels.
+    string next_page_token = 2;
+}
+
+message UpdateLabelRequest {
+    // The label to be updated. The `name` field is used to specify which
+    // label to update. Only fields with non-default values will be updated,
+    // as long as they are specified in `update_mask`.
+    Label label = 1;
+
+    // A field mask of which fields to update. A nil or empty field mask will be
+    // interpreted as updating all fields specified in `label`. Specifying a
+    // single `*` means doing a full replacement of the label.
+    google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteLabelRequest {
+    // The name.
+    // Format: labels/{label}
     string name = 1;
 }
