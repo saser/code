@@ -3,6 +3,7 @@ package testsuite
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -543,6 +544,10 @@ func (s *Suite) TestCreateLabel_Duplicate() {
 	_, err := s.client.CreateLabel(ctx, req)
 	if got, want := status.Code(err), codes.AlreadyExists; got != want {
 		t.Fatalf("Creating duplicate: CreateLabel(%v) err = %v; want code %v", req, err, want)
+	}
+	// We want the error to point to the resource name of the existing label.
+	if got, want := err.Error(), original.GetName(); !strings.Contains(got, want) {
+		t.Errorf("Creating duplicate: CreateLabel(%v) err = %q; want substring %q", req, got, want)
 	}
 }
 
