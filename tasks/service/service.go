@@ -1486,6 +1486,94 @@ func (s *Service) ArchiveProject(ctx context.Context, req *pb.ArchiveProjectRequ
 	return project, nil
 }
 
+func (s *Service) CreateLabel(ctx context.Context, req *pb.CreateLabelRequest) (*pb.Label, error) {
+	label := req.GetLabel()
+	if label.GetLabel() == "" {
+		return nil, status.Error(codes.InvalidArgument, "The label must have a title.")
+	}
+	var existingID int64
+	errDuplicateLabel := errors.New("duplicate label")
+	errInvalidLabelString := errors.New("invalid label string")
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		now, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		// First check if a label already exists. We do this as a SELECT because
+		// we need to return the resource name for the existing label in the
+		// error message, and for that we need to find the ID. Without this
+		// requirement, we could just do an INSERT and use a uniqueness
+		// constraint violation as the indication.
+		{
+			sql, args, err := postgres.StatementBuilder.
+				Select("id").
+				From("labels").
+				Where(squirrel.Eq{
+					"label": label.GetLabel(),
+				}).
+				ToSql()
+			if err != nil {
+				return err
+			}
+			var id int64
+			err = tx.QueryRow(ctx, sql, args...).Scan(&id)
+			switch {
+			case err == nil:
+				// The query executed successfully and an existing label was
+				// found.
+				existingID = id
+				return errDuplicateLabel
+			case errors.Is(err, pgx.ErrNoRows):
+				// The query executed successfully but no duplicate label was
+				// found. Do nothing and proceed with INSERT.
+			default:
+				// The query did not execute successfully.
+				return err
+			}
+		}
+		// Now we expect no existing label to exist, so proceed with the INSERT
+		// expecting no uniqueness violations.
+		{
+			sql, args, err := postgres.StatementBuilder.
+				Insert("labels").
+				SetMap(map[string]interface{}{
+					"label":       label.GetLabel(),
+					"create_time": now,
+				}).
+				Suffix("RETURNING id").
+				ToSql()
+			if err != nil {
+				return err
+			}
+			var id int64
+			if err := tx.QueryRow(ctx, sql, args...).Scan(
+				&id,
+			); err != nil {
+				if e := (*pgconn.PgError)(nil); errors.As(err, &e) {
+					if e.Code == pgerrcode.CheckViolation && e.ConstraintName == "label_contains_valid_characters" {
+						return errInvalidLabelString
+					}
+				}
+				return err
+			}
+			label.Name = "labels/" + fmt.Sprint(id)
+			label.CreateTime = timestamppb.New(now)
+			return nil
+		}
+	}); err != nil {
+		if errors.Is(err, errInvalidLabelString) {
+			return nil, status.Errorf(codes.InvalidArgument, "Label string %q contains invalid characters.", label.GetLabel())
+		}
+		if errors.Is(err, errDuplicateLabel) {
+			existingName := "labels/" + fmt.Sprint(existingID)
+			return nil, status.Errorf(codes.AlreadyExists, "The label %q already exists as %q.", s, existingName)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return label, nil
+}
+
 func (s *Service) UnarchiveProject(ctx context.Context, req *pb.UnarchiveProjectRequest) (*pb.Project, error) {
 	name := req.GetName()
 	if name == "" {

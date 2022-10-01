@@ -42,6 +42,20 @@ CREATE TABLE projects (
     CONSTRAINT delete_time_not_after_expire_time CHECK (delete_time IS NULL OR delete_time <= expire_time)
 );
 
+-- The main table of labels.
+CREATE TABLE labels (
+    id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
+    label TEXT NOT NULL,
+    create_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    update_time TIMESTAMP WITH TIME ZONE, -- If non-null, then project has been updated at least once.
+
+    PRIMARY KEY (id),
+    CONSTRAINT label_not_empty CHECK (label <> ''),
+    CONSTRAINT label_is_unique UNIQUE (label),
+    CONSTRAINT label_contains_valid_characters CHECK (label ~* '^[a-zA-Z0-9\-\_\:\@]+$'),
+    CONSTRAINT create_time_not_after_update_time CHECK (update_time IS NULL OR create_time <= update_time)
+);
+
 -- A table of page tokens. The rows in this table define the set of acceptable
 -- values for ListTasksRequest.next_page_token.
 CREATE TABLE task_page_tokens (

@@ -6,6 +6,7 @@ package fake
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,10 @@ import (
 // to ListTasks. Any request for more than maxPageSize tasks will only return
 // (at most) maxPageSize tasks.
 const maxPageSize = 1000
+
+// labelRE matches all valid label strings. It is based on the proto definition of
+// what valid characters are.
+var labelRE = regexp.MustCompile(`^[a-zA-Z0-9\:\-\_\@]+$`)
 
 // taskUpdatableMask contains the fields that can be updated by UpdateTask. It must
 // be kept in sync with the proto definition.
@@ -76,6 +81,11 @@ type Fake struct {
 	projectIndices    map[string]int       // project name -> index in `projects`
 	projectPageTokens map[string]pageToken // token (UUID) -> minimum project ID and whether to show deleted
 
+	nextLabelID     int
+	labels          []*pb.Label
+	labelIndices    map[string]int       // label name -> index in `labels`
+	labelPageTokens map[string]pageToken // token (UUID) -> minimum label ID and whether to show deleted
+
 	// Only used in testing. Nil otherwise.
 	clock clockwork.FakeClock
 }
@@ -92,6 +102,11 @@ func New() *Fake {
 		projects:          nil,
 		projectIndices:    make(map[string]int),
 		projectPageTokens: make(map[string]pageToken),
+
+		nextLabelID:     1,
+		labels:          nil,
+		labelIndices:    make(map[string]int),
+		labelPageTokens: make(map[string]pageToken),
 	}
 }
 
@@ -819,4 +834,34 @@ func (f *Fake) now() time.Time {
 		return f.clock.Now()
 	}
 	return time.Now()
+}
+
+func (f *Fake) CreateLabel(ctx context.Context, req *pb.CreateLabelRequest) (*pb.Label, error) {
+	label := req.GetLabel()
+	labelString := label.GetLabel()
+	if labelString == "" {
+		return nil, status.Error(codes.InvalidArgument, "The label string cannot be empty.")
+	}
+	if !labelRE.MatchString(labelString) {
+		return nil, status.Errorf(codes.InvalidArgument, "Label string %q contains invalid characters.", labelString)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for _, existing := range f.labels {
+		s := label.GetLabel()
+		if s == existing.GetLabel() {
+			return nil, status.Errorf(codes.AlreadyExists, "The label %q already exists as %q.", s, existing.GetName())
+		}
+	}
+
+	created := proto.Clone(label).(*pb.Label)
+	id := f.nextLabelID
+	f.nextLabelID++
+	created.Name = "labels/" + fmt.Sprint(id)
+	created.CreateTime = timestamppb.New(f.now())
+	f.labels = append(f.labels, created)
+	f.labelIndices[created.Name] = len(f.labels) - 1
+	return created, nil
 }

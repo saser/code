@@ -491,7 +491,6 @@ func (s *Suite) TestListLabels_Error() {
 func (s *Suite) TestCreateLabel() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	for _, req := range []*pb.CreateLabelRequest{
 		{Label: &pb.Label{Label: "email"}},
@@ -526,7 +525,6 @@ func (s *Suite) TestCreateLabel() {
 func (s *Suite) TestCreateLabel_Duplicate() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	// We create the original label, which should succeed.
 	original := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
@@ -554,7 +552,6 @@ func (s *Suite) TestCreateLabel_Duplicate() {
 func (s *Suite) TestCreateLabel_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	for _, tt := range []struct {
 		name string
