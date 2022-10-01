@@ -20,7 +20,6 @@ import (
 func (s *Suite) TestGetLabel() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	label := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
 		Label: &pb.Label{
@@ -81,7 +80,6 @@ func (s *Suite) TestGetLabel_AfterDeletion() {
 func (s *Suite) TestGetLabel_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	for _, tt := range []struct {
 		name string

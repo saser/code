@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jonboulle/clockwork"
@@ -18,7 +19,14 @@ type poolTruncater struct {
 }
 
 func (pt *poolTruncater) Truncate(ctx context.Context) error {
-	_, err := pt.pool.Exec(ctx, "TRUNCATE TABLE tasks, task_page_tokens, projects, project_page_tokens")
+	tables := []string{
+		"tasks",
+		"task_page_tokens",
+		"projects",
+		"project_page_tokens",
+		"labels",
+	}
+	_, err := pt.pool.Exec(ctx, "TRUNCATE TABLE "+strings.Join(tables, ", "))
 	return err
 }
 

@@ -146,6 +146,24 @@ func validateProjectName(name string) error {
 	return nil
 }
 
+// validateLabelName returns an error if name isn't a valid task name.
+func validateLabelName(name string) error {
+	const prefix = "labels/"
+	if !strings.HasPrefix(name, prefix) {
+		return &invalidNameError{
+			Name:   name,
+			Reason: fmt.Sprintf("name doesn't have prefix %q", prefix),
+		}
+	}
+	if id := strings.TrimPrefix(name, prefix); id == "" {
+		return &invalidNameError{
+			Name:   name,
+			Reason: fmt.Sprintf("name doesn't have a resource ID after %q", prefix),
+		}
+	}
+	return nil
+}
+
 // childIndices returns indices into f.tasks for all tasks that are direct
 // children to the task named parent. Note that this does not include parent
 // itself, nor any transitive children.
@@ -834,6 +852,25 @@ func (f *Fake) now() time.Time {
 		return f.clock.Now()
 	}
 	return time.Now()
+}
+
+func (f *Fake) GetLabel(ctx context.Context, req *pb.GetLabelRequest) (*pb.Label, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the label is required.")
+	}
+	if err := validateLabelName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the label must have format "labels/{label}", but it was %q.`, name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.labelIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+	}
+	return proto.Clone(f.labels[idx]).(*pb.Label), nil
 }
 
 func (f *Fake) CreateLabel(ctx context.Context, req *pb.CreateLabelRequest) (*pb.Label, error) {

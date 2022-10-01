@@ -1486,6 +1486,40 @@ func (s *Service) ArchiveProject(ctx context.Context, req *pb.ArchiveProjectRequ
 	return project, nil
 }
 
+func (s *Service) GetLabel(ctx context.Context, req *pb.GetLabelRequest) (*pb.Label, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the label is required.")
+	}
+	if !strings.HasPrefix(name, "labels/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the label must have format "labels/{label}", but it was %q.`, name)
+	}
+	resourceID := strings.TrimPrefix(name, "labels/")
+	if resourceID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the label does not contain a resource ID after "labels/".`)
+	}
+	id, err := strconv.ParseInt(resourceID, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+	}
+	var label *pb.Label
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		t, err := queryLabelByID(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		label = t
+		return nil
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return label, nil
+}
+
 func (s *Service) CreateLabel(ctx context.Context, req *pb.CreateLabelRequest) (*pb.Label, error) {
 	label := req.GetLabel()
 	if label.GetLabel() == "" {
@@ -1566,7 +1600,7 @@ func (s *Service) CreateLabel(ctx context.Context, req *pb.CreateLabelRequest) (
 		}
 		if errors.Is(err, errDuplicateLabel) {
 			existingName := "labels/" + fmt.Sprint(existingID)
-			return nil, status.Errorf(codes.AlreadyExists, "The label %q already exists as %q.", s, existingName)
+			return nil, status.Errorf(codes.AlreadyExists, "The label %q already exists as %q.", label.GetLabel(), existingName)
 		}
 		klog.Error(err)
 		return nil, internalError
@@ -1829,6 +1863,45 @@ func queryProjectByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool
 		project.UpdateTime = timestamppb.New(updateTime.Time)
 	}
 	return project, nil
+}
+
+// queryLabelByID queries the database within the given transaction for the
+// label with the given ID. Any errors from database driver is returned. For
+// example, if no label is found by the given ID, pgx.ErrNoRows is returned, and
+// callers should check for it using errors.Is.
+func queryLabelByID(ctx context.Context, tx pgx.Tx, id int64) (*pb.Label, error) {
+	label := &pb.Label{
+		Name: "labels/" + fmt.Sprint(id),
+	}
+	var (
+		createTime time.Time
+		updateTime pgtype.Timestamptz
+	)
+	sql, args, err := postgres.StatementBuilder.
+		Select(
+			"label",
+			"create_time",
+			"update_time",
+		).
+		From("labels").
+		Where(squirrel.Eq{
+			"id": id,
+		}).ToSql()
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.QueryRow(ctx, sql, args...).Scan(
+		&label.Label,
+		&createTime,
+		&updateTime,
+	); err != nil {
+		return nil, err
+	}
+	label.CreateTime = timestamppb.New(createTime)
+	if updateTime.Status == pgtype.Present {
+		label.UpdateTime = timestamppb.New(updateTime.Time)
+	}
+	return label, nil
 }
 
 func (s *Service) now(ctx context.Context, tx pgx.Tx) (time.Time, error) {
