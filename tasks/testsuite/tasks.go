@@ -651,18 +651,7 @@ func (s *Suite) TestCreateTask_Error() {
 			name: "EmptyTitle",
 			req: &pb.CreateTaskRequest{
 				Task: &pb.Task{
-					Title:     "",
-					Completed: false,
-				},
-			},
-			want: codes.InvalidArgument,
-		},
-		{
-			name: "AlreadyCompleted",
-			req: &pb.CreateTaskRequest{
-				Task: &pb.Task{
-					Title:     "Something already done",
-					Completed: true,
+					Title: "",
 				},
 			},
 			want: codes.InvalidArgument,
@@ -1168,19 +1157,6 @@ func (s *Suite) TestUpdateTask_Error() {
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{
 					Paths: []string{"name"},
-				},
-			},
-			want: codes.InvalidArgument,
-		},
-		{
-			name: "UpdateCompleted",
-			req: &pb.UpdateTaskRequest{
-				Task: &pb.Task{
-					Name:      task.GetName(),
-					Completed: true,
-				},
-				UpdateMask: &fieldmaskpb.FieldMask{
-					Paths: []string{"completed"},
 				},
 			},
 			want: codes.InvalidArgument,
@@ -1780,7 +1756,6 @@ func (s *Suite) TestCompleteTask_UncompleteTask_ClearsCompleteTime() {
 	// Complete the task after 30 minutes.
 	{
 		s.clock.Advance(30 * time.Minute)
-		task.Completed = true
 		now := s.clock.Now()
 		task.CompleteTime = timestamppb.New(now)
 		task.UpdateTime = timestamppb.New(now)
@@ -1796,7 +1771,6 @@ func (s *Suite) TestCompleteTask_UncompleteTask_ClearsCompleteTime() {
 	// Uncomplete the task after another 30 minutes.
 	{
 		s.clock.Advance(30 * time.Minute)
-		task.Completed = false
 		task.CompleteTime = nil
 		task.UpdateTime = timestamppb.New(s.clock.Now())
 		req := &pb.UncompleteTaskRequest{
@@ -1843,10 +1817,8 @@ func (s *Suite) TestCompleteTask_WithChildren() {
 		// We set up `parent` and `child` to be what we expect, and we will
 		// compare against it later.
 		now := s.clock.Now()
-		parent.Completed = true
 		parent.CompleteTime = timestamppb.New(now)
 		parent.UpdateTime = timestamppb.New(now)
-		child.Completed = true
 		child.CompleteTime = timestamppb.New(now)
 		child.UpdateTime = timestamppb.New(now)
 
@@ -1896,7 +1868,6 @@ func (s *Suite) TestCompleteTask_WithChildren_AllChildrenCompleted() {
 	// Completing the parent with `force: false` should succeed and leave both
 	// parent and child completed.
 	now := s.clock.Now()
-	parent.Completed = true
 	parent.CompleteTime = timestamppb.New(now)
 	parent.UpdateTime = timestamppb.New(now)
 	req := &pb.CompleteTaskRequest{
@@ -2082,10 +2053,8 @@ func (s *Suite) TestUncompleteTask_WithParent() {
 	{
 		// Set up `child` and `parent` so that we can compare with them later.
 		now := s.clock.Now()
-		child.Completed = false
 		child.CompleteTime = nil
 		child.UpdateTime = timestamppb.New(now)
-		parent.Completed = false
 		parent.CompleteTime = nil
 		parent.UpdateTime = timestamppb.New(now)
 
@@ -2155,7 +2124,6 @@ func (s *Suite) TestUncompleteTask_WithParent_ParentUncompleted() {
 	s.clock.Advance(14 * time.Hour)
 	{
 		// We will compare the result with `child`.
-		child.Completed = false
 		child.CompleteTime = nil
 		child.UpdateTime = timestamppb.New(s.clock.Now())
 
@@ -2220,8 +2188,8 @@ func (s *Suite) TestUncompleteTask_InHierarchy() {
 		middle,
 		leaf,
 	} {
-		if got, want := task.GetCompleted(), true; got != want {
-			t.Errorf("Task %q has completed = %v; want %v", task.GetName(), got, want)
+		if err := task.GetCompleteTime().CheckValid(); err != nil {
+			t.Errorf("Task %q has invalid complete_time: %v", task.GetName(), err)
 		}
 	}
 	if t.Failed() {
@@ -2285,8 +2253,8 @@ func (s *Suite) TestUncompleteTask_InHierarchy() {
 		middle,
 		leaf,
 	} {
-		if got, want := task.GetCompleted(), true; got != want {
-			t.Errorf("Task %q has completed = %v; want %v", task.GetName(), got, want)
+		if err := task.GetCompleteTime().CheckValid(); err != nil {
+			t.Errorf("Task %q has invalid complete_time: %v", task.GetName(), err)
 		}
 	}
 	if t.Failed() {
@@ -2376,7 +2344,7 @@ func (s *Suite) TestUncompleteTask_InHierarchy() {
 			s.client.UncompleteTaskT(ctx, t, tt.req)
 			got := make(map[string]bool)
 			for name := range tt.want {
-				got[name] = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: name}).GetCompleted()
+				got[name] = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{Name: name}).GetCompleteTime().IsValid()
 			}
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Fatalf("Unexpected result of UncompleteTask(%v), true == completed (-want +got)\n%s", tt.req, diff)

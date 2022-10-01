@@ -87,24 +87,21 @@ message Task {
     // descriptions.
     string description = 4;
 
-    // Whether the task has been completed.
-    bool completed = 5;
-
-    // When the task was completed. Only set if `completed` is true. If a task
-    // is completed and then later uncompleted, this timestamp will be empty.
-    google.protobuf.Timestamp complete_time = 6;
+    // When the task was completed. A task is considered completed if any only
+    // if this is a valid timestamp.
+    google.protobuf.Timestamp complete_time = 5;
 
     // When the task was created.
-    google.protobuf.Timestamp create_time = 7;
+    google.protobuf.Timestamp create_time = 6;
 
     // When the task was last updated, if ever.
-    google.protobuf.Timestamp update_time = 8;
+    google.protobuf.Timestamp update_time = 7;
 
     // When the task was last soft deleted, if ever.
-    google.protobuf.Timestamp delete_time = 9;
+    google.protobuf.Timestamp delete_time = 8;
 
     // When the task will be permanently deleted after being soft deleted.
-    google.protobuf.Timestamp expire_time = 10;
+    google.protobuf.Timestamp expire_time = 9;
 }
 
 // A project is a container of tasks. Projects map to the GTD concept of a

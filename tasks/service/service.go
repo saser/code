@@ -246,7 +246,6 @@ func (s *Service) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.
 			}
 			if completeTime.Status == pgtype.Present {
 				task.CompleteTime = timestamppb.New(completeTime.Time)
-				task.Completed = true
 			}
 			if updateTime.Status == pgtype.Present {
 				task.UpdateTime = timestamppb.New(updateTime.Time)
@@ -320,7 +319,7 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 	if task.GetTitle() == "" {
 		return nil, status.Error(codes.InvalidArgument, "The task must have a title.")
 	}
-	if task.GetCompleted() {
+	if task.GetCompleteTime().IsValid() {
 		return nil, status.Error(codes.InvalidArgument, "The task must not already be completed.")
 	}
 	parent := task.GetParent()
@@ -740,7 +739,6 @@ func (s *Service) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest)
 		// Special case: a completed task can be completed again, which is a
 		// no-op.
 		if task.GetCompleteTime().IsValid() {
-			task.Completed = true
 			return nil
 		}
 		completeTime, err := s.now(ctx, tx)
@@ -766,7 +764,6 @@ func (s *Service) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest)
 			return errForceRequired
 		}
 		toCompleteIDs = append(toCompleteIDs, id)
-		task.Completed = true
 		task.CompleteTime = timestamppb.New(completeTime)
 		task.UpdateTime = timestamppb.New(completeTime)
 		sql, args, err := postgres.StatementBuilder.
@@ -860,7 +857,6 @@ func (s *Service) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequ
 		if err != nil {
 			return err
 		}
-		task.Completed = false
 		task.CompleteTime = nil
 		task.UpdateTime = timestamppb.New(updateTime)
 		sql, args, err := postgres.StatementBuilder.
@@ -1670,7 +1666,6 @@ func queryTaskByID(ctx context.Context, tx pgx.Tx, id int64, showDeleted bool) (
 		task.Parent = fmt.Sprintf("tasks/%d", *parent)
 	}
 	if completeTime.Status == pgtype.Present {
-		task.Completed = true
 		task.CompleteTime = timestamppb.New(completeTime.Time)
 	}
 	task.CreateTime = timestamppb.New(createTime)

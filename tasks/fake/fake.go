@@ -255,7 +255,7 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 	if task.GetTitle() == "" {
 		return nil, status.Error(codes.InvalidArgument, "The task must have a title.")
 	}
-	if task.GetCompleted() {
+	if task.GetCompleteTime().IsValid() {
 		return nil, status.Error(codes.InvalidArgument, "The task must not already be completed.")
 	}
 
@@ -475,7 +475,6 @@ func (f *Fake) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest) (*
 	now := f.now()
 	for _, idx := range toCompleteIndices {
 		completed := f.tasks[idx]
-		completed.Completed = true
 		completed.CompleteTime = timestamppb.New(now)
 		completed.UpdateTime = timestamppb.New(now)
 	}
@@ -523,7 +522,6 @@ func (f *Fake) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequest
 	now := f.now()
 	for _, idx := range toUncompleteIndices {
 		uncompleted := f.tasks[idx]
-		uncompleted.Completed = false
 		uncompleted.CompleteTime = nil
 		uncompleted.UpdateTime = timestamppb.New(now)
 	}
