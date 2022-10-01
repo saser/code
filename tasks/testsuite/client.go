@@ -217,3 +217,79 @@ func (c *testClient) UnarchiveProjectT(ctx context.Context, tb testing.TB, req *
 	}
 	return project
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Label operations.
+///////////////////////////////////////////////////////////////////////////////
+
+func (c *testClient) GetLabelT(ctx context.Context, tb testing.TB, req *pb.GetLabelRequest) *pb.Label {
+	tb.Helper()
+	label, err := c.GetLabel(ctx, req)
+	if err != nil {
+		tb.Fatalf("GetLabel(%v) err = %v; want nil", req, err)
+	}
+	return label
+}
+
+func (c *testClient) ListLabelsT(ctx context.Context, tb testing.TB, req *pb.ListLabelsRequest) *pb.ListLabelsResponse {
+	tb.Helper()
+	res, err := c.ListLabels(ctx, req)
+	if err != nil {
+		tb.Fatalf("ListLabels(%v) err = %v; want nil", req, err)
+	}
+	return res
+}
+
+func (c *testClient) ListAllLabelsT(ctx context.Context, tb testing.TB, req *pb.ListLabelsRequest) []*pb.Label {
+	tb.Helper()
+	var labels []*pb.Label
+	req = proto.Clone(req).(*pb.ListLabelsRequest)
+	for {
+		res := c.ListLabelsT(ctx, tb, req)
+		labels = append(labels, res.GetLabels()...)
+		token := res.GetNextPageToken()
+		if token == "" {
+			break
+		}
+		req.PageToken = token
+	}
+	return labels
+}
+
+func (c *testClient) CreateLabelT(ctx context.Context, tb testing.TB, req *pb.CreateLabelRequest) *pb.Label {
+	tb.Helper()
+	label, err := c.CreateLabel(ctx, req)
+	if err != nil {
+		tb.Fatalf("CreateLabel(%v) err = %v; want nil", req, err)
+	}
+	return label
+}
+
+func (c *testClient) CreateLabelsT(ctx context.Context, tb testing.TB, labels []*pb.Label) []*pb.Label {
+	tb.Helper()
+	var created []*pb.Label
+	for _, label := range labels {
+		created = append(created, c.CreateLabelT(ctx, tb, &pb.CreateLabelRequest{
+			Label: label,
+		}))
+	}
+	return created
+}
+
+func (c *testClient) UpdateLabelT(ctx context.Context, tb testing.TB, req *pb.UpdateLabelRequest) *pb.Label {
+	tb.Helper()
+	label, err := c.UpdateLabel(ctx, req)
+	if err != nil {
+		tb.Fatalf("UpdateLabel(%v) err = %v; want nil", req, err)
+	}
+	return label
+}
+
+func (c *testClient) DeleteLabelT(ctx context.Context, tb testing.TB, req *pb.DeleteLabelRequest) *pb.Label {
+	tb.Helper()
+	label, err := c.DeleteLabel(ctx, req)
+	if err != nil {
+		tb.Fatalf("DeleteLabel(%v) err = %v; want nil", req, err)
+	}
+	return label
+}

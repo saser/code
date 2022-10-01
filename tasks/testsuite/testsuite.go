@@ -16,6 +16,10 @@ func projectLessFunc(p1, p2 *pb.Project) bool {
 	return p1.GetName() < p2.GetName()
 }
 
+func labelLessFunc(l1, l2 *pb.Project) bool {
+	return l1.GetName() < l2.GetName()
+}
+
 // Suite contains a suite of tests for an implementation of Tasks service.
 type Suite struct {
 	suite.Suite
