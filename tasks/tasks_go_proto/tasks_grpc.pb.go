@@ -12,6 +12,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -68,7 +69,7 @@ type TasksClient interface {
 	// Update a single label.
 	UpdateLabel(ctx context.Context, in *UpdateLabelRequest, opts ...grpc.CallOption) (*Label, error)
 	// Delete a single label. This operation cannot be undone.
-	DeleteLabel(ctx context.Context, in *DeleteLabelRequest, opts ...grpc.CallOption) (*Label, error)
+	DeleteLabel(ctx context.Context, in *DeleteLabelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type tasksClient struct {
@@ -259,8 +260,8 @@ func (c *tasksClient) UpdateLabel(ctx context.Context, in *UpdateLabelRequest, o
 	return out, nil
 }
 
-func (c *tasksClient) DeleteLabel(ctx context.Context, in *DeleteLabelRequest, opts ...grpc.CallOption) (*Label, error) {
-	out := new(Label)
+func (c *tasksClient) DeleteLabel(ctx context.Context, in *DeleteLabelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/tasks.Tasks/DeleteLabel", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -317,7 +318,7 @@ type TasksServer interface {
 	// Update a single label.
 	UpdateLabel(context.Context, *UpdateLabelRequest) (*Label, error)
 	// Delete a single label. This operation cannot be undone.
-	DeleteLabel(context.Context, *DeleteLabelRequest) (*Label, error)
+	DeleteLabel(context.Context, *DeleteLabelRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTasksServer()
 }
 
@@ -404,7 +405,7 @@ func (UnimplementedTasksServer) UpdateLabel(context.Context, *UpdateLabelRequest
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateLabel not implemented")
 }
 
-func (UnimplementedTasksServer) DeleteLabel(context.Context, *DeleteLabelRequest) (*Label, error) {
+func (UnimplementedTasksServer) DeleteLabel(context.Context, *DeleteLabelRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteLabel not implemented")
 }
 func (UnimplementedTasksServer) mustEmbedUnimplementedTasksServer() {}

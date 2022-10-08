@@ -6,6 +6,7 @@ import (
 
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type testClient struct {
@@ -285,11 +286,11 @@ func (c *testClient) UpdateLabelT(ctx context.Context, tb testing.TB, req *pb.Up
 	return label
 }
 
-func (c *testClient) DeleteLabelT(ctx context.Context, tb testing.TB, req *pb.DeleteLabelRequest) *pb.Label {
+func (c *testClient) DeleteLabelT(ctx context.Context, tb testing.TB, req *pb.DeleteLabelRequest) *emptypb.Empty {
 	tb.Helper()
-	label, err := c.DeleteLabel(ctx, req)
+	empty, err := c.DeleteLabel(ctx, req)
 	if err != nil {
 		tb.Fatalf("DeleteLabel(%v) err = %v; want nil", req, err)
 	}
-	return label
+	return empty
 }
