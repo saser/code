@@ -600,7 +600,6 @@ func (s *Suite) TestCreateLabel_Error() {
 func (s *Suite) TestUpdateLabel() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	// Clock will be reset to createTime before the label is created.
 	createTime := s.clock.Now()
@@ -697,7 +696,7 @@ func (s *Suite) TestUpdateLabel() {
 		{
 			// Trying to update the label with identical values should be a
 			// no-op. This should be indicated by a missing `update_time` value.
-			name: "IdenticalTitle",
+			name: "IdenticalLabel",
 			label: &pb.Label{
 				Label: "before",
 			},
@@ -706,7 +705,7 @@ func (s *Suite) TestUpdateLabel() {
 					Label: "before",
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{
-					Paths: []string{"title"},
+					Paths: []string{"label"},
 				},
 			},
 			want: &pb.Label{
@@ -718,6 +717,12 @@ func (s *Suite) TestUpdateLabel() {
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			// We truncate in between all tests because label strings must be
+			// unique. Many of the test cases uses label strings like "before"
+			// and "after" which otherwise would result in duplicates and
+			// subsequent unrelated test failures.
+			s.truncate(ctx)
+
 			// We need to reset the time to createTime.
 			// We want to find `d` such that `now + d = createTime.`
 			// Therefore `d = createTime - now.`
@@ -753,7 +758,6 @@ func (s *Suite) TestUpdateLabel() {
 func (s *Suite) TestUpdateLabel_MultipleUpdates() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	// This test asserts that the update time is changed everytime the label is
 	// updated.
@@ -791,10 +795,51 @@ func (s *Suite) TestUpdateLabel_MultipleUpdates() {
 	}
 }
 
+func (s *Suite) TestUpdateLabel_ToExistingLabelString() {
+	t := s.T()
+	ctx := context.Background()
+
+	// This test asserts that a label cannot be updated to have a label string
+	// equal to that of another label.
+
+	existing := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "existing",
+		},
+	})
+	updated := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "some-label",
+		},
+	})
+	req := &pb.UpdateLabelRequest{
+		Label: &pb.Label{
+			Name:  updated.GetName(),
+			Label: existing.GetLabel(),
+		},
+	}
+	_, err := s.client.UpdateLabel(ctx, req)
+	if got, want := status.Code(err), codes.AlreadyExists; got != want {
+		t.Fatalf("UpdateLabel(%v) err = %v; want code %v", req, err, want)
+	}
+
+	// Both labels should have been left unchanged.
+	for _, want := range []*pb.Label{
+		existing,
+		updated,
+	} {
+		got := s.client.GetLabelT(ctx, t, &pb.GetLabelRequest{
+			Name: want.GetName(),
+		})
+		if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
+			t.Errorf("After failed update: label %q has unexpected contents (-want +got)\n%s", want.GetName(), diff)
+		}
+	}
+}
+
 func (s *Suite) TestUpdateLabel_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	label := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
 		Label: &pb.Label{

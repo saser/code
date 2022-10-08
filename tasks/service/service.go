@@ -55,7 +55,7 @@ func init() {
 var projectUpdatableMask *fieldmaskpb.FieldMask
 
 func init() {
-	m, err := fieldmaskpb.New(&pb.Task{},
+	m, err := fieldmaskpb.New(&pb.Project{},
 		"title",
 		"description",
 	)
@@ -63,6 +63,20 @@ func init() {
 		klog.Exit(err)
 	}
 	projectUpdatableMask = m
+}
+
+// labelUpdatableMask contains the fields that can be updated by UpdateLabel. It must
+// be kept in sync with the proto definition.
+var labelUpdatableMask *fieldmaskpb.FieldMask
+
+func init() {
+	m, err := fieldmaskpb.New(&pb.Label{},
+		"label",
+	)
+	if err != nil {
+		klog.Exit(err)
+	}
+	labelUpdatableMask = m
 }
 
 type Service struct {
@@ -1751,6 +1765,164 @@ func (s *Service) CreateLabel(ctx context.Context, req *pb.CreateLabelRequest) (
 		return nil, internalError
 	}
 	return label, nil
+}
+
+func (s *Service) UpdateLabel(ctx context.Context, req *pb.UpdateLabelRequest) (*pb.Label, error) {
+	// First we do stateless validation, i.e., look for errors that we can find
+	// by only looking at the request message.
+	patch := req.GetLabel()
+	name := patch.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the label is required.")
+	}
+	if !strings.HasPrefix(name, "labels/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the label must have format "labels/{label}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(name, "labels/"), 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+	}
+	updateMask := req.GetUpdateMask()
+	if updateMask == nil {
+		// This is not really necessary, but makes downstream handling easier by
+		// not having to be careful about nil derefs.
+		updateMask = &fieldmaskpb.FieldMask{}
+	}
+	// Handle two special cases:
+	// 1. The update mask is nil or empty. Then it should be equivalent to
+	//    updating all non-empty fields in the patch.
+	// 2. The update mask contains a single path that is the wildcard ("*").
+	// 	  Then it should be treated as specifying all updatable paths.
+	switch paths := updateMask.GetPaths(); {
+	case len(paths) == 0:
+		if v := patch.GetLabel(); v != "" {
+			updateMask.Paths = append(updateMask.GetPaths(), "label")
+		}
+	case len(paths) == 1 && paths[0] == "*":
+		updateMask = proto.Clone(labelUpdatableMask).(*fieldmaskpb.FieldMask)
+	}
+	for _, path := range updateMask.GetPaths() {
+		switch path {
+		case "name", "create_time", "update_time":
+			return nil, status.Errorf(codes.InvalidArgument, "The field %q cannot be updated with UpdateLabel.")
+		case "*":
+			// We handled the only valid case of giving a wildcard path above,
+			// i.e., when it is the only path.
+			return nil, status.Error(codes.InvalidArgument, "A wildcard can only be used if it is the single path in the update mask.")
+		}
+	}
+	if updateMask != nil && !updateMask.IsValid(&pb.Label{}) {
+		return nil, status.Error(codes.InvalidArgument, "The given update mask is invalid.")
+	}
+	// At this point we know that updateMask is not empty and is a valid mask.
+	// The path(s) fully specify what we should get from the patch. It may still
+	// be the case that the patch is empty.
+
+	// updatedLabel is the new version of the label that should eventually be
+	// returned as the result of the update operation -- even if it is a no-op.
+	var updatedLabel *pb.Label
+
+	var existingID int64
+	errDuplicateLabel := errors.New("label string already exists")
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		// Eventually, we need to return either an error or the label, regardless
+		// of whether it has been updated or not. So let's fetch it here, so we
+		// quickly find out if it doesn't exist. If it does exist, we also get
+		// all the details we eventually need to return about it.
+		updatedLabel, err = queryLabelByID(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		// Special case: the patch is empty so we should just return the current
+		// version of the label which we fetched above.
+		if proto.Equal(patch, &pb.Label{Name: name} /* empty patch except for the name */) {
+			return nil
+		}
+		// Special case: the update mask is empty, meaning that the operation
+		// will be a no-op even if the patch isn't empty.
+		if len(updateMask.GetPaths()) == 0 {
+			return nil
+		}
+		// Special case: the patch isn't empty and at least one path is
+		// specified, but the applying the patch will yield an identical
+		// resource.
+		afterPatch := proto.Clone(updatedLabel).(*pb.Label)
+		proto.Merge(afterPatch, patch)
+		if proto.Equal(afterPatch, updatedLabel) {
+			klog.Error("I think it's a no-op")
+			return nil
+		}
+
+		// We cannot update to a label string that already exists. We could
+		// detect this by trying to do the update and let Postgres return an
+		// error, but we want to return the name of the label which has the
+		// existing label string, so we must do a query.
+		sql, args, err := postgres.StatementBuilder.
+			Select("id").
+			From("labels").
+			Where(squirrel.Eq{
+				"label": patch.GetLabel(),
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+
+		err = tx.QueryRow(ctx, sql, args...).Scan(&existingID)
+		switch {
+		case err == nil:
+			// The query executed successfully and an existing label was
+			// found.
+			return errDuplicateLabel
+		case errors.Is(err, pgx.ErrNoRows):
+			// The query executed successfully but no duplicate label was
+			// found. Do nothing and proceed with UPDATE.
+		default:
+			// The query did not execute successfully.
+			return err
+		}
+
+		updateTime, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		updatedLabel.UpdateTime = timestamppb.New(updateTime)
+
+		// Update only the columns corresponding to the fields in the patch.
+		q := postgres.StatementBuilder.
+			Update("labels").
+			Where(squirrel.Eq{
+				"id": id,
+			}).
+			Set("update_time", updateTime)
+		for _, path := range updateMask.GetPaths() {
+			switch path {
+			case "label":
+				v := patch.GetLabel()
+				q = q.Set("label", v)
+				updatedLabel.Label = v
+			}
+		}
+
+		sql, args, err = q.ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, sql, args...)
+		return err
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", patch.GetName())
+		}
+		if errors.Is(err, errDuplicateLabel) {
+			existingName := "labels/" + fmt.Sprint(existingID)
+			return nil, status.Errorf(codes.AlreadyExists, "The label %q already exists as %q.", patch.GetLabel(), existingName)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+
+	return updatedLabel, nil
 }
 
 func (s *Service) UnarchiveProject(ctx context.Context, req *pb.UnarchiveProjectRequest) (*pb.Project, error) {
