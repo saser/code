@@ -80,7 +80,11 @@ CREATE TABLE project_page_tokens (
 -- values for ListLabelsRequest.next_page_token.
 CREATE TABLE label_page_tokens (
     token UUID NOT NULL,
-    minimum_id BIGINT NOT NULL REFERENCES labels (id),
+    -- `minimum_id` practically references `labels.id`, but labels can be
+    -- deleted while page tokens exist that point to their IDs. So we drop the
+    -- foreign key constraint here, as it's not providing much safety anyway.
+    minimum_id BIGINT NOT NULL,
+
 
     PRIMARY KEY (token)
 );

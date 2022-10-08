@@ -43,7 +43,6 @@ func (s *Suite) TestGetLabel() {
 func (s *Suite) TestGetLabel_AfterDeletion() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	label := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
 		Label: &pb.Label{
@@ -260,7 +259,6 @@ func (s *Suite) TestListLabels_DifferentPageSizes() {
 func (s *Suite) TestListLabels_WithDeletions() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	seed := []*pb.Label{
 		{Label: "first"},
@@ -948,7 +946,6 @@ func (s *Suite) TestUpdateLabel_Error() {
 func (s *Suite) TestUpdateLabel_AfterDeletion() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	label := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
 		Label: &pb.Label{
@@ -974,7 +971,6 @@ func (s *Suite) TestUpdateLabel_AfterDeletion() {
 func (s *Suite) TestDeleteLabel() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	label := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
 		Label: &pb.Label{
@@ -1004,7 +1000,6 @@ func (s *Suite) TestDeleteLabel() {
 func (s *Suite) TestDeleteLabel_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	for _, tt := range []struct {
 		name string

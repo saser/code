@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/klog/v2"
@@ -884,7 +885,11 @@ func (f *Fake) GetLabel(ctx context.Context, req *pb.GetLabelRequest) (*pb.Label
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
 	}
-	return proto.Clone(f.labels[idx]).(*pb.Label), nil
+	label := f.labels[idx]
+	if label == nil {
+		return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+	}
+	return proto.Clone(label).(*pb.Label), nil
 }
 
 func (f *Fake) ListLabels(ctx context.Context, req *pb.ListLabelsRequest) (*pb.ListLabelsResponse, error) {
@@ -1047,4 +1052,27 @@ func (f *Fake) UpdateLabel(ctx context.Context, req *pb.UpdateLabelRequest) (*pb
 	}
 	f.labels[idx] = updated
 	return updated, nil
+}
+
+func (f *Fake) DeleteLabel(ctx context.Context, req *pb.DeleteLabelRequest) (*emptypb.Empty, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the label is required.")
+	}
+	if err := validateLabelName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the label must have format "labels/{label}", but it was %q.`, name)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	idx, ok := f.labelIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+	}
+	if f.labels[idx] == nil {
+		return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+	}
+	f.labels[idx] = nil
+	return &emptypb.Empty{}, nil
 }

@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/klog/v2"
@@ -1923,6 +1924,47 @@ func (s *Service) UpdateLabel(ctx context.Context, req *pb.UpdateLabelRequest) (
 	}
 
 	return updatedLabel, nil
+}
+
+func (s *Service) DeleteLabel(ctx context.Context, req *pb.DeleteLabelRequest) (*emptypb.Empty, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the label is required.")
+	}
+	if !strings.HasPrefix(name, "labels/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the label must have format "labels/{label}", but it was %q.`, name)
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(name, "labels/"), 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+	}
+	errNotFound := errors.New("label not found")
+	if err := s.pool.BeginFunc(ctx, func(tx pgx.Tx) error {
+		sql, args, err := postgres.StatementBuilder.
+			Delete("labels").
+			Where(squirrel.Eq{
+				"id": id,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, sql, args...)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return errNotFound
+		}
+		return nil
+	}); err != nil {
+		if errors.Is(err, errNotFound) {
+			return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Service) UnarchiveProject(ctx context.Context, req *pb.UnarchiveProjectRequest) (*pb.Project, error) {
