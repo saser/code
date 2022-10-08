@@ -29,6 +29,7 @@ go_repositories()
 
 go_rules_dependencies()
 
+# This version number must be kept in sync with tools.mk.
 go_register_toolchains(version = "1.19.2")
 
 gazelle_dependencies()
