@@ -873,6 +873,53 @@ func (f *Fake) GetLabel(ctx context.Context, req *pb.GetLabelRequest) (*pb.Label
 	return proto.Clone(f.labels[idx]).(*pb.Label), nil
 }
 
+func (f *Fake) ListLabels(ctx context.Context, req *pb.ListLabelsRequest) (*pb.ListLabelsResponse, error) {
+	pageSize := req.GetPageSize()
+	if pageSize < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "The page size must not be negative; was %d.", pageSize)
+	}
+	if pageSize == 0 || pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	minIndex := 0
+	if token := req.GetPageToken(); token != "" {
+		pt, ok := f.labelPageTokens[token]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", token)
+		}
+		minIndex = pt.MinimumIndex
+		delete(f.labelPageTokens, token)
+	}
+
+	// Start adding labels that we will return.
+	res := &pb.ListLabelsResponse{}
+	for idx := minIndex; idx < len(f.labels) && len(res.GetLabels()) <= int(pageSize); idx++ {
+		label := f.labels[idx]
+		if label == nil {
+			continue
+		}
+		res.Labels = append(res.GetLabels(), proto.Clone(label).(*pb.Label))
+	}
+
+	// If there is one extra label, use it to create a new page token.
+	if len(res.GetLabels()) == int(pageSize)+1 {
+		nextLabel := res.GetLabels()[len(res.GetLabels())-1]
+		res.Labels = res.GetLabels()[:pageSize]
+
+		nextMinIndex := f.labelIndices[nextLabel.GetName()]
+		token := uuid.NewString()
+		f.labelPageTokens[token] = pageToken{
+			MinimumIndex: nextMinIndex,
+		}
+		res.NextPageToken = token
+	}
+	return res, nil
+}
+
 func (f *Fake) CreateLabel(ctx context.Context, req *pb.CreateLabelRequest) (*pb.Label, error) {
 	label := req.GetLabel()
 	labelString := label.GetLabel()

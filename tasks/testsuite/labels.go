@@ -131,7 +131,6 @@ func (s *Suite) TestGetLabel_Error() {
 func (s *Suite) TestListLabels() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	want := s.client.CreateLabelsT(ctx, t, []*pb.Label{
 		{Label: "email"},
@@ -157,7 +156,6 @@ func (s *Suite) TestListLabels() {
 func (s *Suite) TestListLabels_MaxPageSize() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	labels := make([]*pb.Label, s.maxPageSize*2-s.maxPageSize/2)
 	for i := range labels {
@@ -189,7 +187,6 @@ func (s *Suite) TestListLabels_MaxPageSize() {
 func (s *Suite) TestListLabels_DifferentPageSizes() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	// 7 labels. Number chosen arbitrarily.
 	labels := s.client.CreateLabelsT(ctx, t, []*pb.Label{
@@ -363,7 +360,6 @@ func (s *Suite) TestListLabels_WithDeletions() {
 func (s *Suite) TestListLabels_WithAdditions() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	labels := s.client.CreateLabelsT(ctx, t, []*pb.Label{
 		{Label: "email"},
@@ -408,7 +404,6 @@ func (s *Suite) TestListLabels_WithAdditions() {
 func (s *Suite) TestListLabels_SamePageTokenTwice() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	labels := s.client.CreateLabelsT(ctx, t, []*pb.Label{
 		{Label: "email"},
@@ -454,7 +449,6 @@ func (s *Suite) TestListLabels_SamePageTokenTwice() {
 func (s *Suite) TestListLabels_Error() {
 	t := s.T()
 	ctx := context.Background()
-	t.Skip("not implemented")
 
 	for _, tt := range []struct {
 		name string

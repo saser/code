@@ -76,6 +76,15 @@ CREATE TABLE project_page_tokens (
     PRIMARY KEY (token)
 );
 
+-- A table of page tokens. The rows in this table define the set of acceptable
+-- values for ListLabelsRequest.next_page_token.
+CREATE TABLE label_page_tokens (
+    token UUID NOT NULL,
+    minimum_id BIGINT NOT NULL REFERENCES labels (id),
+
+    PRIMARY KEY (token)
+);
+
 -- In many cases we want to run queries over existing tasks only. This view is a
 -- convenient way to do that, compared to having to remember to filter out
 -- deleted tasks yourself.

@@ -1520,6 +1520,151 @@ func (s *Service) GetLabel(ctx context.Context, req *pb.GetLabelRequest) (*pb.La
 	return label, nil
 }
 
+func (s *Service) ListLabels(ctx context.Context, req *pb.ListLabelsRequest) (*pb.ListLabelsResponse, error) {
+	pageSize := req.GetPageSize()
+	if pageSize < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "The page size must not be negative; was %d.", pageSize)
+	}
+	if pageSize == 0 || pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+	if token := req.GetPageToken(); token != "" {
+		if _, err := uuid.Parse(token); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+		}
+	}
+
+	res := &pb.ListLabelsResponse{}
+	errNoToken := errors.New("page token given but not found")
+	txFunc := func(tx pgx.Tx) error {
+		// First find out what the minimum ID to use in this page is. If this is
+		// the first page, it will be 0. If it is not, then it will be a value
+		// stored in the `label_page_tokens` database table, and the `page_token`
+		// field in the request contains the key to that table.
+		minID := int64(0)
+		if token := req.GetPageToken(); token != "" {
+			// We could do a SELECT and then a DELETE, but since Postgres
+			// supports the RETURNING clause, we can do it in just one
+			// statement. Neat!
+			sql, args, err := postgres.StatementBuilder.
+				Delete("label_page_tokens").
+				Where(squirrel.Eq{
+					"token": token,
+				}).
+				Suffix("RETURNING minimum_id").
+				ToSql()
+			if err != nil {
+				return err
+			}
+			if err := tx.QueryRow(ctx, sql, args...).Scan(&minID); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return errNoToken
+				}
+				return err
+			}
+		}
+
+		// Now that we know the minimum ID, we can run a SELECT to list labels.
+		// We set a limit of pageSize+1 so that we may get the first label in the
+		// next page (if any). This allows us to do one query that gives us
+		//     1. if there is a next page, and if so,
+		//     2. what the minimum ID will be for that page.
+		var (
+			// The eventual list of labels to return.
+			labels []*pb.Label
+			// The columns in the row.
+			id         int64
+			label      string
+			createTime time.Time
+			updateTime pgtype.Timestamptz
+			// To use for the next page, if any.
+			nextMinID int64
+		)
+		sql, args, err := postgres.StatementBuilder.
+			Select(
+				"id",
+				"label",
+				"create_time",
+				"update_time",
+			).
+			From("labels").
+			Where(squirrel.GtOrEq{
+				"id": minID,
+			}).
+			OrderBy("id ASC").
+			Limit(uint64(pageSize) + 1).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		// qf is called for every row returned by the above query, after
+		// scanning has completed successfully.
+		qf := func(qfr pgx.QueryFuncRow) error {
+			if id > nextMinID {
+				nextMinID = id
+			}
+			label := &pb.Label{
+				Name:       "labels/" + fmt.Sprint(id),
+				Label:      label,
+				CreateTime: timestamppb.New(createTime),
+			}
+			if updateTime.Status == pgtype.Present {
+				label.UpdateTime = timestamppb.New(updateTime.Time)
+			}
+			labels = append(labels, label)
+			return nil
+		}
+		// Here is where the actual query happens.
+		if _, err := tx.QueryFunc(ctx, sql,
+			args,
+			[]interface{}{
+				&id,
+				&label,
+				&createTime,
+				&updateTime,
+			},
+			qf,
+		); err != nil {
+			return err
+		}
+
+		// If the number of labels from the above query is less than or equal to
+		// pageSize, we know that there will be no more pages We can then do an
+		// early return.
+		if int32(len(labels)) <= pageSize {
+			res.Labels = labels
+			return nil
+		}
+
+		// We know at this point that there will be at least one more page, so
+		// we limit the labels in this page to the pageSize and then create the
+		// token for the next page.
+		res.Labels = labels[:pageSize]
+		token := uuid.New()
+		res.NextPageToken = token.String()
+		sql, args, err = postgres.StatementBuilder.
+			Insert("label_page_tokens").
+			Columns("token", "minimum_id").
+			Values(token, nextMinID).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := s.pool.BeginFunc(ctx, txFunc); err != nil {
+		if errors.Is(err, errNoToken) {
+			return nil, status.Errorf(codes.InvalidArgument, "The page token %q is invalid.", req.GetPageToken())
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return res, nil
+}
+
 func (s *Service) CreateLabel(ctx context.Context, req *pb.CreateLabelRequest) (*pb.Label, error) {
 	label := req.GetLabel()
 	if label.GetLabel() == "" {
