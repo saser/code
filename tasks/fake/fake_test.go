@@ -40,6 +40,15 @@ func (t *truncater) Truncate(ctx context.Context) error {
 		delete(t.s.projectIndices, k)
 	}
 	t.s.nextProjectID = 1
+
+	t.s.labels = []*pb.Label{}
+	for k := range t.s.labelPageTokens {
+		delete(t.s.labelPageTokens, k)
+	}
+	for k := range t.s.labelIndices {
+		delete(t.s.labelIndices, k)
+	}
+	t.s.nextLabelID = 1
 	return nil
 }
 
