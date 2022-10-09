@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/tracelog"
 	"go.saser.se/postgres/log/klogadapter"
 )
 
@@ -29,7 +30,10 @@ func Open(ctx context.Context, connString string) (*Pool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("postgres: open: %w", err)
 	}
-	cfg.ConnConfig.Logger = klogadapter.NewLogger()
+	cfg.ConnConfig.Tracer = &tracelog.TraceLog{
+		Logger:   klogadapter.NewLogger(),
+		LogLevel: tracelog.LogLevelTrace,
+	}
 	pool, err := openConfigWithRetry(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: open: %w", err)
@@ -47,8 +51,17 @@ func openConfigWithRetry(ctx context.Context, cfg *pgxpool.Config) (*Pool, error
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			pool, err := pgxpool.ConnectConfig(ctx, cfg)
+			pool, err := pgxpool.NewWithConfig(ctx, cfg)
 			if err != nil {
+				continue
+			}
+			// We do a ping here to be more certain that the pool will actually
+			// be useful after this method returns. If we don't do this we get
+			// flaky tests that start up Postgres containers because the Docker
+			// version of Postgres seems to be doing something weird at startup,
+			// such as starting up and then restarting. Not sure what happens,
+			// but this seems to fix it.
+			if err := pool.Ping(ctx); err != nil {
 				continue
 			}
 			return &Pool{Pool: pool}, nil

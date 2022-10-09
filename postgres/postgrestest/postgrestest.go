@@ -53,14 +53,14 @@ func Open(ctx context.Context, tb testing.TB, schemaPath string) *postgres.Pool 
 	}).String()
 	pool, err := postgres.Open(ctx, connString)
 	if err != nil {
-		tb.Fatal(err)
+		tb.Fatalf("Failed to open connection pool: %v", err)
 	}
 	tb.Cleanup(pool.Close)
 
 	// Now that we have a connection we can run the schema script.
 	schemaSQL := string(runfiles.ReadT(tb, schemaPath))
 	if _, err := pool.Exec(ctx, schemaSQL); err != nil {
-		tb.Fatal(err)
+		tb.Fatalf("Failed to create schema: %v", err)
 	}
 
 	// The container is up and has the correct schema, and we are ready to

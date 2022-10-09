@@ -14,7 +14,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//postgres/log/klogadapter",
-        "@com_github_jackc_pgx_v4//pgxpool",
+        "@com_github_jackc_pgx_v5//pgxpool",
+        "@com_github_jackc_pgx_v5//tracelog",
         "@com_github_masterminds_squirrel//:squirrel",
     ],
 )

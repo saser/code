@@ -6,7 +6,7 @@ go_library(
     importpath = "go.saser.se/postgres/log/klogadapter",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_jackc_pgx_v4//:pgx",
+        "@com_github_jackc_pgx_v5//tracelog",
         "@io_k8s_klog_v2//:klog",
     ],
 )

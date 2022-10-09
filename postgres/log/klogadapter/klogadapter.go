@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5/tracelog"
 	"k8s.io/klog/v2"
 )
 
-// Logger implements pgx.Logger.
+// Logger implements tracelog.Logger.
 type Logger struct{}
 
 // NewLogger returns a new Logger ready for use.
@@ -19,10 +19,11 @@ func NewLogger() *Logger {
 	return &Logger{}
 }
 
-// Log implements pgx.Logger.Log. LogLevelTrace and LogLevelDebug are written to
-// the INFO level with a "(level)" prefix. LogLevelNone, as well as the zero
-// value for LogLevel, are written to the ERROR level with a "(level)" prefix.
-func (l *Logger) Log(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
+// Log implements tracelog.Logger.Log. LogLevelTrace and LogLevelDebug are
+// written to the INFO level with a "(level)" prefix. LogLevelNone, as well as
+// the zero value for LogLevel, are written to the ERROR level with a "(level)"
+// prefix.
+func (l *Logger) Log(ctx context.Context, level tracelog.LogLevel, msg string, data map[string]interface{}) {
 	var sb strings.Builder
 	sb.WriteString(msg)
 	sb.WriteString(" [")
@@ -37,13 +38,13 @@ func (l *Logger) Log(ctx context.Context, level pgx.LogLevel, msg string, data m
 	sb.WriteString("]")
 	s := sb.String()
 	switch level {
-	case pgx.LogLevelTrace, pgx.LogLevelDebug:
+	case tracelog.LogLevelTrace, tracelog.LogLevelDebug:
 		klog.InfoDepth(2, "("+level.String()+") "+s)
-	case pgx.LogLevelInfo:
+	case tracelog.LogLevelInfo:
 		klog.InfoDepth(2, s)
-	case pgx.LogLevelWarn:
+	case tracelog.LogLevelWarn:
 		klog.WarningDepth(2, s)
-	case pgx.LogLevelError:
+	case tracelog.LogLevelError:
 		klog.ErrorDepth(2, s)
 	default:
 		klog.ErrorDepth(2, "("+level.String()+") "+s)
