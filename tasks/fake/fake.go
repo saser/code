@@ -272,7 +272,11 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 		if err := validateTaskName(parent); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, `The name of the parent must follow the format "tasks/{task}", but it was %q.`, parent)
 		}
-		if _, ok := f.taskIndices[parent]; !ok {
+		idx, ok := f.taskIndices[parent]
+		if !ok {
+			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
+		}
+		if p := f.tasks[idx]; p.GetDeleteTime().IsValid() {
 			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
 		}
 	}
@@ -280,7 +284,11 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 		if err := validateLabelName(label); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, `The name of the label must follow the format "labels/{label}" but was %q.`, label)
 		}
-		if _, ok := f.labelIndices[label]; !ok {
+		idx, ok := f.labelIndices[label]
+		if !ok {
+			return nil, status.Errorf(codes.NotFound, `A label with name %q does not exist.`, label)
+		}
+		if f.labels[idx] == nil {
 			return nil, status.Errorf(codes.NotFound, `A label with name %q does not exist.`, label)
 		}
 	}

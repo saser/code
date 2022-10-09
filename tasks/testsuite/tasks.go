@@ -640,6 +640,71 @@ func (s *Suite) TestCreateTask_WithParent() {
 	}
 }
 
+func (s *Suite) TestCreateTask_DeletedParent() {
+	t := s.T()
+	ctx := context.Background()
+
+	// Create a parent task.
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "A parent task",
+		},
+	})
+	// Then soft delete it.
+	s.client.DeleteTaskT(ctx, t, &pb.DeleteTaskRequest{
+		Name: parent.GetName(),
+	})
+	// Creating a task with this parent should fail.
+	createReq := &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Parent: parent.GetName(),
+			Title:  "Child task",
+		},
+	}
+	_, err := s.client.CreateTask(ctx, createReq)
+	if got, want := status.Code(err), codes.NotFound; got != want {
+		t.Fatalf("After deleting parent: CreateTask(%v) err = %v; want code %v", createReq, err, want)
+	}
+
+	// Undelete the parent. After this, creating the task with the parent should
+	// succeed.
+	s.client.UndeleteTaskT(ctx, t, &pb.UndeleteTaskRequest{
+		Name: parent.GetName(),
+	})
+	if _, err := s.client.CreateTask(ctx, createReq); err != nil {
+		t.Fatalf("After undeleting parent: CreateTask(%v) err = %v; want nil", createReq, err)
+	}
+}
+
+func (s *Suite) TestCreateTask_DeletedLabel() {
+	t := s.T()
+	ctx := context.Background()
+
+	// Create a label
+	label := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "some-label",
+		},
+	})
+	// Then hard delete it.
+	s.client.DeleteLabelT(ctx, t, &pb.DeleteLabelRequest{
+		Name: label.GetName(),
+	})
+	// Creating a task with this label should fail.
+	createReq := &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "Child task",
+			Labels: []string{
+				label.GetName(),
+			},
+		},
+	}
+	_, err := s.client.CreateTask(ctx, createReq)
+	if got, want := status.Code(err), codes.NotFound; got != want {
+		t.Fatalf("After deleting parent: CreateTask(%v) err = %v; want code %v", createReq, err, want)
+	}
+}
+
 func (s *Suite) TestCreateTask_Error() {
 	t := s.T()
 	ctx := context.Background()

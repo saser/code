@@ -382,6 +382,12 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 			"create_time": now,
 		}
 		if parentID != -1 {
+			if _, err := queryTaskByID(ctx, tx, parentID, false /* showDeleted */); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return errParentNotFound
+				}
+				return err
+			}
 			set["parent"] = parentID
 		}
 		sql, args, err := postgres.StatementBuilder.
