@@ -2041,6 +2041,17 @@ func (s *Service) UnarchiveProject(ctx context.Context, req *pb.UnarchiveProject
 	return project, nil
 }
 
+func (s *Service) now(ctx context.Context, tx pgx.Tx) (time.Time, error) {
+	if s.clock != nil {
+		return s.clock.Now(), nil
+	}
+	var now time.Time
+	if err := tx.QueryRow(ctx, "SELECT NOW()").Scan(&now); err != nil {
+		return time.Time{}, err
+	}
+	return now, nil
+}
+
 // queryDescendantIDs returns the IDs of all tasks descending, directly or
 // transitively, from rootID. Note that rootID is itself not included in the
 // resulting slice. If showDeleted is true, IDs from deleted descendant tasks
@@ -2284,15 +2295,4 @@ func queryLabelByID(ctx context.Context, tx pgx.Tx, id int64) (*pb.Label, error)
 		label.UpdateTime = timestamppb.New(updateTime.Time)
 	}
 	return label, nil
-}
-
-func (s *Service) now(ctx context.Context, tx pgx.Tx) (time.Time, error) {
-	if s.clock != nil {
-		return s.clock.Now(), nil
-	}
-	var now time.Time
-	if err := tx.QueryRow(ctx, "SELECT NOW()").Scan(&now); err != nil {
-		return time.Time{}, err
-	}
-	return now, nil
 }

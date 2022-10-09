@@ -179,48 +179,6 @@ func validateLabelName(name string) error {
 	return nil
 }
 
-// childIndices returns indices into f.tasks for all tasks that are direct
-// children to the task named parent. Note that this does not include parent
-// itself, nor any transitive children.
-func (f *Fake) childIndices(parent string) []int {
-	var indices []int
-	for i, task := range f.tasks {
-		if task.GetParent() == parent {
-			indices = append(indices, i)
-		}
-	}
-	return indices
-}
-
-// descendantIndices returns indices into f.tasks for all tasks that are either
-// direct or transitive descendants of the task named parent. Note that this
-// does not include parent itself.
-func (f *Fake) descendantIndices(parent string) []int {
-	indices := f.childIndices(parent)
-	for _, i := range indices {
-		indices = append(indices, f.childIndices(f.tasks[i].GetName())...)
-	}
-	return indices
-}
-
-// ancestorIndices returns indices into f.tasks for all tasks that are either a
-// direct or transitive ancestors of the task named child. Note that this does
-// not include child itself.
-func (f *Fake) ancestorIndices(child string) []int {
-	var indices []int
-	current := child
-	for current != "" {
-		parent := f.tasks[f.taskIndices[current]].GetParent()
-		if parent != "" {
-			indices = append(indices, f.taskIndices[parent])
-			current = parent
-		} else {
-			break
-		}
-	}
-	return indices
-}
-
 func (f *Fake) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.Task, error) {
 	name := req.GetName()
 	if name == "" {
@@ -860,15 +818,6 @@ func (f *Fake) UnarchiveProject(ctx context.Context, req *pb.UnarchiveProjectReq
 	return proto.Clone(project).(*pb.Project), nil
 }
 
-// now returns time.Now() except if f.clock is non-nil, then that clock is used
-// instead. now assumes that the mutex is held when called.
-func (f *Fake) now() time.Time {
-	if f.clock != nil {
-		return f.clock.Now()
-	}
-	return time.Now()
-}
-
 func (f *Fake) GetLabel(ctx context.Context, req *pb.GetLabelRequest) (*pb.Label, error) {
 	name := req.GetName()
 	if name == "" {
@@ -1075,4 +1024,55 @@ func (f *Fake) DeleteLabel(ctx context.Context, req *pb.DeleteLabelRequest) (*em
 	}
 	f.labels[idx] = nil
 	return &emptypb.Empty{}, nil
+}
+
+// now returns time.Now() except if f.clock is non-nil, then that clock is used
+// instead. now assumes that the mutex is held when called.
+func (f *Fake) now() time.Time {
+	if f.clock != nil {
+		return f.clock.Now()
+	}
+	return time.Now()
+}
+
+// childIndices returns indices into f.tasks for all tasks that are direct
+// children to the task named parent. Note that this does not include parent
+// itself, nor any transitive children.
+func (f *Fake) childIndices(parent string) []int {
+	var indices []int
+	for i, task := range f.tasks {
+		if task.GetParent() == parent {
+			indices = append(indices, i)
+		}
+	}
+	return indices
+}
+
+// descendantIndices returns indices into f.tasks for all tasks that are either
+// direct or transitive descendants of the task named parent. Note that this
+// does not include parent itself.
+func (f *Fake) descendantIndices(parent string) []int {
+	indices := f.childIndices(parent)
+	for _, i := range indices {
+		indices = append(indices, f.childIndices(f.tasks[i].GetName())...)
+	}
+	return indices
+}
+
+// ancestorIndices returns indices into f.tasks for all tasks that are either a
+// direct or transitive ancestors of the task named child. Note that this does
+// not include child itself.
+func (f *Fake) ancestorIndices(child string) []int {
+	var indices []int
+	current := child
+	for current != "" {
+		parent := f.tasks[f.taskIndices[current]].GetParent()
+		if parent != "" {
+			indices = append(indices, f.taskIndices[parent])
+			current = parent
+		} else {
+			break
+		}
+	}
+	return indices
 }
