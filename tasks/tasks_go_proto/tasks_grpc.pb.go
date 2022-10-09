@@ -42,6 +42,8 @@ type TasksClient interface {
 	CompleteTask(ctx context.Context, in *CompleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
 	// Mark a task as not completed.
 	UncompleteTask(ctx context.Context, in *UncompleteTaskRequest, opts ...grpc.CallOption) (*Task, error)
+	// Modify the set of labels on a task.
+	ModifyTaskLabels(ctx context.Context, in *ModifyTaskLabelsRequest, opts ...grpc.CallOption) (*Task, error)
 	// Get a single project by name.
 	GetProject(ctx context.Context, in *GetProjectRequest, opts ...grpc.CallOption) (*Project, error)
 	// List projects.
@@ -146,6 +148,15 @@ func (c *tasksClient) CompleteTask(ctx context.Context, in *CompleteTaskRequest,
 func (c *tasksClient) UncompleteTask(ctx context.Context, in *UncompleteTaskRequest, opts ...grpc.CallOption) (*Task, error) {
 	out := new(Task)
 	err := c.cc.Invoke(ctx, "/tasks.Tasks/UncompleteTask", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tasksClient) ModifyTaskLabels(ctx context.Context, in *ModifyTaskLabelsRequest, opts ...grpc.CallOption) (*Task, error) {
+	out := new(Task)
+	err := c.cc.Invoke(ctx, "/tasks.Tasks/ModifyTaskLabels", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -291,6 +302,8 @@ type TasksServer interface {
 	CompleteTask(context.Context, *CompleteTaskRequest) (*Task, error)
 	// Mark a task as not completed.
 	UncompleteTask(context.Context, *UncompleteTaskRequest) (*Task, error)
+	// Modify the set of labels on a task.
+	ModifyTaskLabels(context.Context, *ModifyTaskLabelsRequest) (*Task, error)
 	// Get a single project by name.
 	GetProject(context.Context, *GetProjectRequest) (*Project, error)
 	// List projects.
@@ -355,6 +368,10 @@ func (UnimplementedTasksServer) CompleteTask(context.Context, *CompleteTaskReque
 
 func (UnimplementedTasksServer) UncompleteTask(context.Context, *UncompleteTaskRequest) (*Task, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UncompleteTask not implemented")
+}
+
+func (UnimplementedTasksServer) ModifyTaskLabels(context.Context, *ModifyTaskLabelsRequest) (*Task, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ModifyTaskLabels not implemented")
 }
 
 func (UnimplementedTasksServer) GetProject(context.Context, *GetProjectRequest) (*Project, error) {
@@ -561,6 +578,24 @@ func _Tasks_UncompleteTask_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TasksServer).UncompleteTask(ctx, req.(*UncompleteTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tasks_ModifyTaskLabels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ModifyTaskLabelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).ModifyTaskLabels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tasks.Tasks/ModifyTaskLabels",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).ModifyTaskLabels(ctx, req.(*ModifyTaskLabelsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -837,6 +872,10 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UncompleteTask",
 			Handler:    _Tasks_UncompleteTask_Handler,
+		},
+		{
+			MethodName: "ModifyTaskLabels",
+			Handler:    _Tasks_ModifyTaskLabels_Handler,
 		},
 		{
 			MethodName: "GetProject",

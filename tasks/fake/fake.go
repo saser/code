@@ -276,6 +276,14 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
 		}
 	}
+	for _, label := range task.GetLabels() {
+		if err := validateLabelName(label); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, `The name of the label must follow the format "labels/{label}" but was %q.`, label)
+		}
+		if _, ok := f.labelIndices[label]; !ok {
+			return nil, status.Errorf(codes.NotFound, `A label with name %q does not exist.`, label)
+		}
+	}
 
 	created := proto.Clone(task).(*pb.Task)
 	id := f.nextTaskID
@@ -531,6 +539,92 @@ func (f *Fake) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequest
 		uncompleted.CompleteTime = nil
 		uncompleted.UpdateTime = timestamppb.New(now)
 	}
+	return proto.Clone(task).(*pb.Task), nil
+}
+
+func (f *Fake) ModifyTaskLabels(ctx context.Context, req *pb.ModifyTaskLabelsRequest) (*pb.Task, error) {
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if err := validateTaskName(name); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	adds := make(map[string]bool)
+	for _, name := range req.GetAddLabels() {
+		if err := validateLabelName(name); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, `The name of the added label must have format "labels/{label}" but it was %q.`, name)
+		}
+		adds[name] = true
+	}
+	removes := make(map[string]bool)
+	for _, name := range req.GetRemoveLabels() {
+		if err := validateLabelName(name); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, `The name of the removed label must have format "labels/{label}" but it was %q.`, name)
+		}
+		if adds[name] {
+			return nil, status.Errorf(codes.InvalidArgument, "The label %q is specified in both `add_labels` and `remove_labels`.", name)
+		}
+		removes[name] = true
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Verify that the task exists.
+	idx, ok := f.taskIndices[name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+	task := f.tasks[idx]
+	if task.GetDeleteTime().IsValid() {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+
+	// Verify that all labels being added or removed exist.
+	var referencedLabels []string
+	for name := range adds {
+		referencedLabels = append(referencedLabels, name)
+	}
+	for name := range removes {
+		referencedLabels = append(referencedLabels, name)
+	}
+	for _, name := range referencedLabels {
+		idx, ok := f.labelIndices[name]
+		if !ok {
+			return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+		}
+		if f.labels[idx] == nil {
+			return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+		}
+	}
+
+	// Now we know that the full input is valid. Here is where we make the changes.
+	// We treat everything as sets that are modified and then converted into a
+	// slice.
+
+	// Get the existing labelSet.
+	labelSet := make(map[string]bool)
+	for _, name := range task.GetLabels() {
+		labelSet[name] = true
+	}
+	// Add labels that should be added.
+	for name := range adds {
+		labelSet[name] = true
+	}
+	// Remove labels that should be removed. Note that removing a label that
+	// doesn't exist is allowed and is a no-op.
+	for name := range removes {
+		delete(labelSet, name)
+	}
+	// Now labelSet contains the new set of labels, and we can do a full
+	// replacement of the task's labels.
+	var labels []string
+	for name := range labelSet {
+		labels = append(labels, name)
+	}
+	task.Labels = labels
+	task.UpdateTime = timestamppb.New(f.now())
 	return proto.Clone(task).(*pb.Task), nil
 }
 

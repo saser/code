@@ -351,7 +351,24 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 		}
 		parentID = id
 	}
+	var labelIDs []int64
+	for _, name := range task.GetLabels() {
+		if name == "" || !strings.HasPrefix(name, "labels/") {
+			return nil, status.Errorf(codes.InvalidArgument, `The label name must have the format "labels/{label}" but was %q.`, name)
+		}
+		resourceID := strings.TrimPrefix(name, "labels/")
+		if resourceID == "" {
+			return nil, status.Errorf(codes.InvalidArgument, `The label name must have the format "labels/{label}" but was %q.`, name)
+		}
+		id, err := strconv.ParseInt(resourceID, 10, 64)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", name)
+		}
+		labelIDs = append(labelIDs, id)
+	}
 	errParentNotFound := errors.New("parent not found")
+	var missingLabelID int64
+	errMissingLabel := errors.New("label not found")
 	// This constraint name should be taken from the schema file.
 	const parentReferencesID = "parent_references_id"
 	if err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -375,27 +392,50 @@ func (s *Service) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*p
 		if err != nil {
 			return err
 		}
-		var id int64
+		var taskID int64
 		if err := tx.QueryRow(ctx, sql, args...).Scan(
-			&id,
+			&taskID,
 		); err != nil {
 			if e := (*pgconn.PgError)(nil); errors.As(err, &e) {
-				if e.Code != pgerrcode.ForeignKeyViolation {
-					return err
+				if e.Code == pgerrcode.ForeignKeyViolation && e.ConstraintName == parentReferencesID {
+					return errParentNotFound
 				}
-				if e.ConstraintName != parentReferencesID {
-					return err
-				}
-				return errParentNotFound
 			}
 			return err
 		}
-		task.Name = "tasks/" + fmt.Sprint(id)
+		task.Name = "tasks/" + fmt.Sprint(taskID)
 		task.CreateTime = timestamppb.New(now)
+		// We also need to add associations between the newly created task and
+		// its labels.
+		for _, labelID := range labelIDs {
+			sql, args, err := postgres.StatementBuilder.
+				Insert("task_labels").
+				SetMap(map[string]any{
+					"task_id":  taskID,
+					"label_id": labelID,
+				}).
+				ToSql()
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, sql, args...); err != nil {
+				if e := (*pgconn.PgError)(nil); errors.As(err, &e) {
+					if e.Code == pgerrcode.ForeignKeyViolation && e.ConstraintName == "label_id_foreign_key" {
+						missingLabelID = labelID
+						return errMissingLabel
+					}
+				}
+				return err
+			}
+		}
 		return nil
 	}); err != nil {
 		if errors.Is(err, errParentNotFound) {
 			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
+		}
+		if errors.Is(err, errMissingLabel) {
+			missingName := fmt.Sprintf("labels/%d", missingLabelID)
+			return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", missingName)
 		}
 		klog.Error(err)
 		return nil, internalError
@@ -898,6 +938,188 @@ func (s *Service) UncompleteTask(ctx context.Context, req *pb.UncompleteTaskRequ
 		}
 		if errors.Is(err, errUncompleteAncestorsRequired) {
 			return nil, status.Errorf(codes.FailedPrecondition, "Task %q has completed ancestors but `uncomplete_ancestors` was not set to true.", name)
+		}
+		klog.Error(err)
+		return nil, internalError
+	}
+	return task, nil
+}
+
+func (s *Service) ModifyTaskLabels(ctx context.Context, req *pb.ModifyTaskLabelsRequest) (*pb.Task, error) {
+	// First, check that the task name is valid.
+	name := req.GetName()
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "The name of the task is required.")
+	}
+	if !strings.HasPrefix(name, "tasks/") {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	resourceID := strings.TrimPrefix(name, "tasks/")
+	if resourceID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, `The name of the task must have format "tasks/{task}", but it was %q.`, name)
+	}
+	taskID, err := strconv.ParseInt(resourceID, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+	}
+
+	// Second, check that the referenced label names are valid.
+	referencedLabels := make(map[string]bool) // name -> true == add, false == remove
+	for _, name := range req.GetAddLabels() {
+		referencedLabels[name] = true
+	}
+	for _, name := range req.GetRemoveLabels() {
+		if referencedLabels[name] {
+			return nil, status.Errorf(codes.InvalidArgument, "The label %q is specified in both `add_labels` and `remove_labels`.", name)
+		}
+		referencedLabels[name] = false
+	}
+	var addIDs, removeIDs []int64
+	for name, add := range referencedLabels {
+		if name == "" || !strings.HasPrefix(name, "labels/") {
+			return nil, status.Errorf(codes.InvalidArgument, `The label name must have format "labels/{label}", but it was %q.`, name)
+		}
+		resourceID := strings.TrimPrefix(name, "labels/")
+		if resourceID == "" {
+			return nil, status.Errorf(codes.InvalidArgument, `The label name must have format "labels/{label}", but it was %q.`, name)
+		}
+		id, err := strconv.ParseInt(resourceID, 10, 64)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+		}
+		if add {
+			addIDs = append(addIDs, id)
+		} else {
+			removeIDs = append(removeIDs, id)
+		}
+	}
+
+	var task *pb.Task
+	var missingLabelID int64
+	errMissingLabel := errors.New("missing label ID")
+	if err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		// First make sure the task exists.
+		task, err = queryTaskByID(ctx, tx, taskID, false /* showDeleted */)
+		if err != nil {
+			return err
+		}
+		// Then make sure that all referenced labels exist.
+		var labelIDs []int64
+		labelIDs = append(labelIDs, addIDs...)
+		labelIDs = append(labelIDs, removeIDs...)
+		for _, id := range labelIDs {
+			if _, err := queryLabelByID(ctx, tx, id); err != nil {
+				return err
+			}
+		}
+		// We do the stupid thing here:
+		// * For each label that should be added, try to insert it into `task_labels`.
+		//     * If that fails because of a primary key violation, it means that
+		//       the label is already set on the task, so we ignore it.
+		//     * If that fails because of a foreign key violation, it means the
+		//       referenced label doesn't exist (we've already check that the
+		//       task exists), so we return a special error.
+		//     * If that fails because of some other reason, bail.
+		// * Issue a DELETE statement for each label that should be removed.
+		//   Ignore whether any deletions actually happened.
+		//     * If that fails because of some unknown SQL error, bail.
+		for _, labelID := range addIDs {
+			sql, args, err := postgres.StatementBuilder.
+				Insert("task_labels").
+				SetMap(map[string]interface{}{
+					"task_id":  taskID,
+					"label_id": labelID,
+				}).
+				ToSql()
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, sql, args...); err != nil {
+				if e := (*pgconn.PgError)(nil); errors.As(err, &e) {
+					if e.Code == pgerrcode.UniqueViolation {
+						// Primary key violation => label is already set on
+						// task, so we ignore this error.
+						continue
+					}
+					if e.Code == pgerrcode.ForeignKeyViolation && e.ConstraintName == "label_id_foreign_key" {
+						// labelID references a task that does not exist.
+						missingLabelID = labelID
+						return errMissingLabel
+					}
+				}
+				// Any other error is unexpected, so bail.
+				return err
+			}
+		}
+		// We have added labels, now let's remove some.
+		sql, args, err := postgres.StatementBuilder.
+			Delete("task_labels").
+			Where(squirrel.Eq{
+				"task_id":  taskID,
+				"label_id": removeIDs,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, sql, args...); err != nil {
+			return err
+		}
+		// Finally, let's use the source of truth to gather the resulting set of
+		// labels.
+		sql, args, err = postgres.StatementBuilder.
+			Select("label_id").
+			From("task_labels").
+			Where(squirrel.Eq{
+				"task_id": taskID,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		rows, err := tx.Query(ctx, sql, args...)
+		if err != nil {
+			return err
+		}
+		task.Labels = nil
+		var labelID int64
+		scans := []any{&labelID}
+		if _, err := pgx.ForEachRow(rows, scans, func() error {
+			task.Labels = append(task.Labels, fmt.Sprintf("labels/%d", labelID))
+			return nil
+		}); err != nil {
+			return err
+		}
+		// As the very last thing, update the task's `update_time` field.
+		now, err := s.now(ctx, tx)
+		if err != nil {
+			return err
+		}
+		task.UpdateTime = timestamppb.New(now)
+		sql, args, err = postgres.StatementBuilder.
+			Update("tasks").
+			SetMap(map[string]any{
+				"update_time": now,
+			}).
+			Where(squirrel.Eq{
+				"id": taskID,
+			}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, status.Errorf(codes.NotFound, "A task with name %q does not exist.", name)
+		}
+		if errors.Is(err, errMissingLabel) {
+			missingName := fmt.Sprintf("labels/%d", missingLabelID)
+			return nil, status.Errorf(codes.NotFound, "A label with name %q does not exist.", missingName)
 		}
 		klog.Error(err)
 		return nil, internalError

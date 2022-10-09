@@ -26,6 +26,7 @@ func (pt *poolTruncater) Truncate(ctx context.Context) error {
 		"project_page_tokens",
 		"labels",
 		"label_page_tokens",
+		"task_labels",
 	}
 	_, err := pt.pool.Exec(ctx, "TRUNCATE TABLE "+strings.Join(tables, ", "))
 	return err

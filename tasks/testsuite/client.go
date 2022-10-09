@@ -116,6 +116,15 @@ func (c *testClient) UncompleteTaskT(ctx context.Context, tb testing.TB, req *pb
 	return task
 }
 
+func (c *testClient) ModifyTaskLabelsT(ctx context.Context, tb testing.TB, req *pb.ModifyTaskLabelsRequest) *pb.Task {
+	tb.Helper()
+	task, err := c.ModifyTaskLabels(ctx, req)
+	if err != nil {
+		tb.Fatalf("UncompleteTask(%v) err = %v; want nil", req, err)
+	}
+	return task
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Project operations.
 ///////////////////////////////////////////////////////////////////////////////

@@ -11,6 +11,7 @@ import (
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -682,6 +683,42 @@ func (s *Suite) TestCreateTask_Error() {
 				Task: &pb.Task{
 					Title:  "Parent doesn't exist",
 					Parent: "tasks/999",
+				},
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "InvalidLabel",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title: "Invalid label",
+					Labels: []string{
+						"invalidlabel/123",
+					},
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "EmptyLabel",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title: "Empty label",
+					Labels: []string{
+						"",
+					},
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "MissingLabel",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title: "Empty label",
+					Labels: []string{
+						"labels/1827179", // Very unlikely to exist.
+					},
 				},
 			},
 			want: codes.NotFound,
@@ -2417,6 +2454,208 @@ func (s *Suite) TestUncompleteTask_Error() {
 			_, err := s.client.UncompleteTask(ctx, tt.req)
 			if got, want := status.Code(err), tt.want; got != want {
 				t.Fatalf("UncompleteTask(%v) err = %v; want code %v", tt.req, err, want)
+			}
+		})
+	}
+}
+
+func (s *Suite) TestModifyTaskLabels() {
+	t := s.T()
+	ctx := context.Background()
+
+	email := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "email",
+		},
+	})
+	home := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "home",
+		},
+	})
+	office := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "office",
+		},
+	})
+	waiting := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "waiting",
+		},
+	})
+
+	for _, tt := range []struct {
+		name      string
+		createReq *pb.CreateTaskRequest       // Create the task, including initial labels.
+		modifyReq *pb.ModifyTaskLabelsRequest // Modify the labels. Will receive name of created task.
+		want      []string                    // The expected set of label _names_ after modification.
+	}{
+		{
+			name: "InitiallyEmpty_NoChanges",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:  "No labels",
+					Labels: nil,
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{},
+			want:      nil,
+		},
+		{
+			name: "InitiallyEmpty_AddOne",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:  "No labels",
+					Labels: nil,
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{
+				AddLabels: []string{
+					email.GetName(),
+				},
+			},
+			want: []string{
+				email.GetName(),
+			},
+		},
+		{
+			name: "InitiallyEmpty_AddSeveral",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:  "No labels",
+					Labels: nil,
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{
+				AddLabels: []string{
+					email.GetName(),
+					home.GetName(),
+					office.GetName(),
+					waiting.GetName(),
+				},
+			},
+			want: []string{
+				// Intentionally not the same order as the request.
+				home.GetName(),
+				email.GetName(),
+				waiting.GetName(),
+				office.GetName(),
+			},
+		},
+		{
+			name: "InitiallyEmpty_RemoveOnly",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:  "No labels",
+					Labels: nil,
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{
+				RemoveLabels: []string{
+					email.GetName(),
+					home.GetName(),
+					office.GetName(),
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "InitiallyEmpty_AddAndRemove",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:  "No labels",
+					Labels: nil,
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{
+				AddLabels: []string{
+					email.GetName(),
+				},
+				RemoveLabels: []string{
+					home.GetName(),
+					office.GetName(),
+				},
+			},
+			want: []string{
+				email.GetName(),
+			},
+		},
+		{
+			name: "RemoveOne",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title: "Some labels",
+					Labels: []string{
+						email.GetName(),
+						home.GetName(),
+						waiting.GetName(),
+					},
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{
+				RemoveLabels: []string{
+					email.GetName(),
+				},
+			},
+			want: []string{
+				waiting.GetName(),
+				home.GetName(),
+			},
+		},
+		{
+			name: "RemoveAll",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title: "Some labels",
+					Labels: []string{
+						email.GetName(),
+						home.GetName(),
+						waiting.GetName(),
+					},
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{
+				RemoveLabels: []string{
+					email.GetName(),
+					home.GetName(),
+					waiting.GetName(),
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "AddAndRemove",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title: "Some labels",
+					Labels: []string{
+						email.GetName(),
+						home.GetName(),
+					},
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{
+				AddLabels: []string{
+					waiting.GetName(),
+				},
+				RemoveLabels: []string{
+					home.GetName(),
+				},
+			},
+			want: []string{
+				waiting.GetName(),
+				email.GetName(),
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			task := s.client.CreateTaskT(ctx, t, tt.createReq)
+			req := proto.Clone(tt.modifyReq).(*pb.ModifyTaskLabelsRequest)
+			req.Name = task.GetName()
+			task = s.client.ModifyTaskLabelsT(ctx, t, req)
+			less := func(s1, s2 string) bool { return s1 < s2 }
+			if diff := cmp.Diff(tt.want, task.GetLabels(), cmpopts.EquateEmpty(), cmpopts.SortSlices(less)); diff != "" {
+				t.Errorf("ModifyTaskLabels(%v) gave unexpected set of labels (-want +got)\n%s", req, diff)
 			}
 		})
 	}

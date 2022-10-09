@@ -85,8 +85,17 @@ CREATE TABLE label_page_tokens (
     -- foreign key constraint here, as it's not providing much safety anyway.
     minimum_id BIGINT NOT NULL,
 
-
     PRIMARY KEY (token)
+);
+
+-- A many-to-many relation between tasks and labels.
+CREATE TABLE task_labels (
+    task_id BIGINT NOT NULL,
+    label_id BIGINT NOT NULL,
+
+    PRIMARY KEY (task_id, label_id),
+    CONSTRAINT task_id_foreign_key FOREIGN KEY (task_id) REFERENCES tasks (id),
+    CONSTRAINT label_id_foreign_key FOREIGN KEY (label_id) REFERENCES labels (id)
 );
 
 -- In many cases we want to run queries over existing tasks only. This view is a
