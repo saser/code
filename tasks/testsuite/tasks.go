@@ -680,7 +680,7 @@ func (s *Suite) TestCreateTask_DeletedLabel() {
 	t := s.T()
 	ctx := context.Background()
 
-	// Create a label
+	// Create a label.
 	label := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
 		Label: &pb.Label{
 			Label: "some-label",
@@ -2721,6 +2721,129 @@ func (s *Suite) TestModifyTaskLabels() {
 			less := func(s1, s2 string) bool { return s1 < s2 }
 			if diff := cmp.Diff(tt.want, task.GetLabels(), cmpopts.EquateEmpty(), cmpopts.SortSlices(less)); diff != "" {
 				t.Errorf("ModifyTaskLabels(%v) gave unexpected set of labels (-want +got)\n%s", req, diff)
+			}
+		})
+	}
+}
+
+func (s *Suite) TestModifyTaskLabels_Error() {
+	t := s.T()
+	ctx := context.Background()
+
+	// This task will be the one we attempt to modify. All requests should fail,
+	// so we expect no changes to it whatsoever.
+	task := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "Task for testing",
+		},
+	})
+
+	// We want to test some situations with an existing label.
+	label := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "some-label",
+		},
+	})
+
+	// We want to be able to test with a proper label that has been deleted.
+	deletedLabel := s.client.CreateLabelT(ctx, t, &pb.CreateLabelRequest{
+		Label: &pb.Label{
+			Label: "deleted",
+		},
+	})
+	s.client.DeleteLabelT(ctx, t, &pb.DeleteLabelRequest{
+		Name: deletedLabel.GetName(),
+	})
+
+	for _, tt := range []struct {
+		name string
+		req  *pb.ModifyTaskLabelsRequest
+		want codes.Code
+	}{
+		{
+			name: "AddEmpty",
+			req: &pb.ModifyTaskLabelsRequest{
+				Name: task.GetName(),
+				AddLabels: []string{
+					"",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "RemoveEmpty",
+			req: &pb.ModifyTaskLabelsRequest{
+				Name: task.GetName(),
+				AddLabels: []string{
+					"",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "AddInvalid",
+			req: &pb.ModifyTaskLabelsRequest{
+				Name: task.GetName(),
+				AddLabels: []string{
+					"invalidlolol/123",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "RemoveInvalid",
+			req: &pb.ModifyTaskLabelsRequest{
+				Name: task.GetName(),
+				RemoveLabels: []string{
+					"invalidlolol/123",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "AddDeletedLabel",
+			req: &pb.ModifyTaskLabelsRequest{
+				Name: task.GetName(),
+				AddLabels: []string{
+					deletedLabel.GetName(),
+				},
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "RemoveDeletedLabel",
+			req: &pb.ModifyTaskLabelsRequest{
+				Name: task.GetName(),
+				RemoveLabels: []string{
+					deletedLabel.GetName(),
+				},
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "AddAndRemoveSame",
+			req: &pb.ModifyTaskLabelsRequest{
+				Name: task.GetName(),
+				RemoveLabels: []string{
+					label.GetName(),
+				},
+				AddLabels: []string{
+					label.GetName(),
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.client.ModifyTaskLabels(ctx, tt.req)
+			if got, want := status.Code(err), tt.want; got != want {
+				t.Errorf("ModifyTaskLabels(%v) err = %v; want code %v", tt.req, err, want)
+			}
+			got := s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+				Name: task.GetName(),
+			})
+			if diff := cmp.Diff(task, got, protocmp.Transform()); diff != "" {
+				t.Errorf("ModifyTaskLabels(%v) unexpectedly modified task (-before +after)\n%s", tt.req, diff)
 			}
 		})
 	}
