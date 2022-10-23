@@ -34,8 +34,20 @@ protoc:
 .PHONY: fix
 fix: \
 	fix-buildifier \
+	fix-clang-format \
 	fix-go-buildfiles \
 	fix-gofumpt
+
+.PHONY: fix-clang-format
+fix-clang-format: \
+	$(clang-format) \
+	$(proto_files)
+fix-clang-format:
+	$(clang-format) \
+		--Werror \
+		-i \
+		--style=google \
+		$(proto_files)
 
 .PHONY: fix-buildifier
 fix-buildifier: \

@@ -7,16 +7,16 @@ option go_package = "go.saser.se/testing/echo_go_proto";
 // The Echo service is a simple service intended to be used in various testing
 // scenarios where an arbitrary gRPC service is needed.
 service Echo {
-    // Echo takes in a message and returns that same message.
-    rpc Echo(EchoRequest) returns (EchoResponse);
+  // Echo takes in a message and returns that same message.
+  rpc Echo(EchoRequest) returns (EchoResponse);
 }
 
 message EchoRequest {
-    // The message. Optional.
-    string message = 1;
+  // The message. Optional.
+  string message = 1;
 }
 
 message EchoResponse {
-    // The message given in the request.
-    string message = 1;
+  // The message given in the request.
+  string message = 1;
 }

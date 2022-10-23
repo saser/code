@@ -9,443 +9,443 @@ import "google/protobuf/timestamp.proto";
 option go_package = "go.saser.se/tasks/tasks_go_proto";
 
 service Tasks {
-    // =========================================================================
-    // Task methods.
-    // =========================================================================
+  // =========================================================================
+  // Task methods.
+  // =========================================================================
 
-    // Get a single task by name.
-    rpc GetTask(GetTaskRequest) returns (Task);
+  // Get a single task by name.
+  rpc GetTask(GetTaskRequest) returns (Task);
 
-    // List tasks.
-    rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  // List tasks.
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
 
-    // Create a new task.
-    rpc CreateTask(CreateTaskRequest) returns (Task);
+  // Create a new task.
+  rpc CreateTask(CreateTaskRequest) returns (Task);
 
-    // Update a single task.
-    rpc UpdateTask(UpdateTaskRequest) returns (Task);
+  // Update a single task.
+  rpc UpdateTask(UpdateTaskRequest) returns (Task);
 
-    // Soft delete a task by name. Soft deleted tasks are still available for
-    // some time but will eventually be permanently deleted.
-    rpc DeleteTask(DeleteTaskRequest) returns (Task);
+  // Soft delete a task by name. Soft deleted tasks are still available for
+  // some time but will eventually be permanently deleted.
+  rpc DeleteTask(DeleteTaskRequest) returns (Task);
 
-    // Undeletes a previously soft deleted task. Can only be done as long as the
-    // task has not been permanently deleted.
-    rpc UndeleteTask(UndeleteTaskRequest) returns (Task);
+  // Undeletes a previously soft deleted task. Can only be done as long as the
+  // task has not been permanently deleted.
+  rpc UndeleteTask(UndeleteTaskRequest) returns (Task);
 
-    // Mark a task as completed.
-    rpc CompleteTask(CompleteTaskRequest) returns (Task);
+  // Mark a task as completed.
+  rpc CompleteTask(CompleteTaskRequest) returns (Task);
 
-    // Mark a task as not completed.
-    rpc UncompleteTask(UncompleteTaskRequest) returns (Task);
+  // Mark a task as not completed.
+  rpc UncompleteTask(UncompleteTaskRequest) returns (Task);
 
-    // Modify the set of labels on a task.
-    rpc ModifyTaskLabels(ModifyTaskLabelsRequest) returns (Task);
+  // Modify the set of labels on a task.
+  rpc ModifyTaskLabels(ModifyTaskLabelsRequest) returns (Task);
 
-    // =========================================================================
-    // Project methods.
-    // =========================================================================
+  // =========================================================================
+  // Project methods.
+  // =========================================================================
 
-    // Get a single project by name.
-    rpc GetProject(GetProjectRequest) returns (Project);
+  // Get a single project by name.
+  rpc GetProject(GetProjectRequest) returns (Project);
 
-    // List projects.
-    rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+  // List projects.
+  rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
 
-    // Create a new project.
-    rpc CreateProject(CreateProjectRequest) returns (Project);
+  // Create a new project.
+  rpc CreateProject(CreateProjectRequest) returns (Project);
 
-    // Update a single project.
-    rpc UpdateProject(UpdateProjectRequest) returns (Project);
+  // Update a single project.
+  rpc UpdateProject(UpdateProjectRequest) returns (Project);
 
-    // Soft delete a project by name. Soft deleted projects are still available
-    // for some time but will eventually be permanently deleted.
-    rpc DeleteProject(DeleteProjectRequest) returns (Project);
+  // Soft delete a project by name. Soft deleted projects are still available
+  // for some time but will eventually be permanently deleted.
+  rpc DeleteProject(DeleteProjectRequest) returns (Project);
 
-    // Undeletes a previously soft deleted project. Can only be done as long as
-    // the project has not been permanently deleted.
-    rpc UndeleteProject(UndeleteProjectRequest) returns (Project);
+  // Undeletes a previously soft deleted project. Can only be done as long as
+  // the project has not been permanently deleted.
+  rpc UndeleteProject(UndeleteProjectRequest) returns (Project);
 
-    // Marks a single project as archived.
-    rpc ArchiveProject(ArchiveProjectRequest) returns (Project);
+  // Marks a single project as archived.
+  rpc ArchiveProject(ArchiveProjectRequest) returns (Project);
 
-    // Marks a single project as active (i.e., not archived).
-    rpc UnarchiveProject(UnarchiveProjectRequest) returns (Project);
+  // Marks a single project as active (i.e., not archived).
+  rpc UnarchiveProject(UnarchiveProjectRequest) returns (Project);
 
-    // =========================================================================
-    // Label methods.
-    // =========================================================================
+  // =========================================================================
+  // Label methods.
+  // =========================================================================
 
-    // Get a single label by name.
-    rpc GetLabel(GetLabelRequest) returns (Label);
+  // Get a single label by name.
+  rpc GetLabel(GetLabelRequest) returns (Label);
 
-    // List labels.
-    rpc ListLabels(ListLabelsRequest) returns (ListLabelsResponse);
+  // List labels.
+  rpc ListLabels(ListLabelsRequest) returns (ListLabelsResponse);
 
-    // Create a new label.
-    rpc CreateLabel(CreateLabelRequest) returns (Label);
+  // Create a new label.
+  rpc CreateLabel(CreateLabelRequest) returns (Label);
 
-    // Update a single label.
-    rpc UpdateLabel(UpdateLabelRequest) returns (Label);
+  // Update a single label.
+  rpc UpdateLabel(UpdateLabelRequest) returns (Label);
 
-    // Delete a single label. This operation cannot be undone.
-    rpc DeleteLabel(DeleteLabelRequest) returns (google.protobuf.Empty);
+  // Delete a single label. This operation cannot be undone.
+  rpc DeleteLabel(DeleteLabelRequest) returns (google.protobuf.Empty);
 }
 
 // A task is a single action that can be completed.
 message Task {
-    // The name of the task.
-    // Format: tasks/{task}
-    string name = 1;
+  // The name of the task.
+  // Format: tasks/{task}
+  string name = 1;
 
-    // The task under which this task is ordered. Optional. Used to build up a
-    // hierarchy of tasks.
-    // Format: tasks/{task}
-    string parent = 2;
+  // The task under which this task is ordered. Optional. Used to build up a
+  // hierarchy of tasks.
+  // Format: tasks/{task}
+  string parent = 2;
 
-    // The title of the task. Must be a short string.
-    string title = 3;
+  // The title of the task. Must be a short string.
+  string title = 3;
 
-    // The description of the task. Can be a long string. Not all tasks have
-    // descriptions.
-    string description = 4;
+  // The description of the task. Can be a long string. Not all tasks have
+  // descriptions.
+  string description = 4;
 
-    // The set of labels attached to the task. Use ModifyTaskLabels to change
-    // this set. As this is a set, each value only occurs once and the order is
-    // undefined.
-    // Format: labels/{label}
-    repeated string labels = 5;
+  // The set of labels attached to the task. Use ModifyTaskLabels to change
+  // this set. As this is a set, each value only occurs once and the order is
+  // undefined.
+  // Format: labels/{label}
+  repeated string labels = 5;
 
-    // When the task was completed. A task is considered completed if any only
-    // if this is a valid timestamp.
-    google.protobuf.Timestamp complete_time = 6;
+  // When the task was completed. A task is considered completed if any only
+  // if this is a valid timestamp.
+  google.protobuf.Timestamp complete_time = 6;
 
-    // When the task was created.
-    google.protobuf.Timestamp create_time = 7;
+  // When the task was created.
+  google.protobuf.Timestamp create_time = 7;
 
-    // When the task was last updated, if ever.
-    google.protobuf.Timestamp update_time = 8;
+  // When the task was last updated, if ever.
+  google.protobuf.Timestamp update_time = 8;
 
-    // When the task was last soft deleted, if ever.
-    google.protobuf.Timestamp delete_time = 9;
+  // When the task was last soft deleted, if ever.
+  google.protobuf.Timestamp delete_time = 9;
 
-    // When the task will be permanently deleted after being soft deleted.
-    google.protobuf.Timestamp expire_time = 10;
+  // When the task will be permanently deleted after being soft deleted.
+  google.protobuf.Timestamp expire_time = 10;
 }
 
 // A project is a container of tasks. Projects map to the GTD concept of a
 // project: something that requires more than one action to complete.
 message Project {
-    // The name.
-    // Format: projects/{project}
-    string name = 1;
+  // The name.
+  // Format: projects/{project}
+  string name = 1;
 
-    // The title of the project. Must be a short string.
-    string title = 2;
+  // The title of the project. Must be a short string.
+  string title = 2;
 
-    // The description of the project. Can be a long string. Not all tasks have
-    // descriptions.
-    string description = 3;
+  // The description of the project. Can be a long string. Not all tasks have
+  // descriptions.
+  string description = 3;
 
-    // When the project was created.
-    google.protobuf.Timestamp create_time = 4;
+  // When the project was created.
+  google.protobuf.Timestamp create_time = 4;
 
-    // When the project was last updated, if ever.
-    google.protobuf.Timestamp update_time = 5;
+  // When the project was last updated, if ever.
+  google.protobuf.Timestamp update_time = 5;
 
-    // When the project was last soft deleted, if ever.
-    google.protobuf.Timestamp delete_time = 6;
+  // When the project was last soft deleted, if ever.
+  google.protobuf.Timestamp delete_time = 6;
 
-    // When the project will be permanently deleted after being soft deleted.
-    google.protobuf.Timestamp expire_time = 7;
+  // When the project will be permanently deleted after being soft deleted.
+  google.protobuf.Timestamp expire_time = 7;
 
-    // When the project was archived, if ever. If a project is archived and
-    // later unarchived this timestamp will be empty.
-    google.protobuf.Timestamp archive_time = 8;
+  // When the project was archived, if ever. If a project is archived and
+  // later unarchived this timestamp will be empty.
+  google.protobuf.Timestamp archive_time = 8;
 }
 
 // A label can be attached to tasks (not projects) to allow for some flexibility
 // in organizing and listing tasks. Attaching a label to a task carries no
 // semantic meaning otherwise.
 message Label {
-    // The resource name.
-    // Format: labels/{label}
-    string name = 1;
+  // The resource name.
+  // Format: labels/{label}
+  string name = 1;
 
-    // The actual label string used by humans. Must be unique. It should be
-    // non-empty, short, and is only allowed to contain:
-    // * alphanumeric characters (a-z, A-Z, 0-9)
-    // * certain special characters: ':', '-', '_', '@'
-    //
-    // Examples:
-    // * email
-    // * Agendas:Boss
-    // * online_work
-    string label = 2;
+  // The actual label string used by humans. Must be unique. It should be
+  // non-empty, short, and is only allowed to contain:
+  // * alphanumeric characters (a-z, A-Z, 0-9)
+  // * certain special characters: ':', '-', '_', '@'
+  //
+  // Examples:
+  // * email
+  // * Agendas:Boss
+  // * online_work
+  string label = 2;
 
-    // When the label was created.
-    google.protobuf.Timestamp create_time = 3;
+  // When the label was created.
+  google.protobuf.Timestamp create_time = 3;
 
-    // When the label was last updated, if ever.
-    google.protobuf.Timestamp update_time = 4;
+  // When the label was last updated, if ever.
+  google.protobuf.Timestamp update_time = 4;
 }
 
 message GetTaskRequest {
-    // The name.
-    // Format: tasks/{task}
-    string name = 1;
+  // The name.
+  // Format: tasks/{task}
+  string name = 1;
 }
 
 message ListTasksRequest {
-    // The standard page size. Optional. If unspecified, the server will choose
-    // a suitable default. Values larger than 1000 will be truncated to 1000.
-    int32 page_size = 1;
+  // The standard page size. Optional. If unspecified, the server will choose
+  // a suitable default. Values larger than 1000 will be truncated to 1000.
+  int32 page_size = 1;
 
-    // The standard page token. Optional. Get the values from responses to
-    // ListTasks.
-    string page_token = 2;
+  // The standard page token. Optional. Get the values from responses to
+  // ListTasks.
+  string page_token = 2;
 
-    // Whether soft deleted resources should be included in the response.
-    bool show_deleted = 3;
+  // Whether soft deleted resources should be included in the response.
+  bool show_deleted = 3;
 }
 
 message ListTasksResponse {
-    // The tasks.
-    repeated Task tasks = 1;
+  // The tasks.
+  repeated Task tasks = 1;
 
-    // The token required to get the next page in a subsequent call to
-    // ListTasks.
-    string next_page_token = 2;
+  // The token required to get the next page in a subsequent call to
+  // ListTasks.
+  string next_page_token = 2;
 }
 
 message CreateTaskRequest {
-    // The task to be created. The `name` field will be ignored. The `title`
-    // field must not be empty, and the `completed` field, if specified, must be
-    // false.
-    Task task = 1;
+  // The task to be created. The `name` field will be ignored. The `title`
+  // field must not be empty, and the `completed` field, if specified, must be
+  // false.
+  Task task = 1;
 }
 
 message UpdateTaskRequest {
-    // The task to be updated. The `name` field is used to specify which task to
-    // update. Only fields with non-default values will be updated, as long as
-    // they are specified in `update_mask`.
-    //
-    // Note that trying to update the `completed` field is an error -- there are
-    // separate RPCs for that.
-    Task task = 1;
+  // The task to be updated. The `name` field is used to specify which task to
+  // update. Only fields with non-default values will be updated, as long as
+  // they are specified in `update_mask`.
+  //
+  // Note that trying to update the `completed` field is an error -- there are
+  // separate RPCs for that.
+  Task task = 1;
 
-    // A field mask of which fields to update. A nil or empty field mask will be
-    // interpreted as updating all fields specified in `task`. Specifying a
-    // single `*` means doing a full replacement of the task.
-    google.protobuf.FieldMask update_mask = 2;
+  // A field mask of which fields to update. A nil or empty field mask will be
+  // interpreted as updating all fields specified in `task`. Specifying a
+  // single `*` means doing a full replacement of the task.
+  google.protobuf.FieldMask update_mask = 2;
 }
 
 message DeleteTaskRequest {
-    // The name.
-    // Format: tasks/{task}
-    string name = 1;
+  // The name.
+  // Format: tasks/{task}
+  string name = 1;
 
-    // Whether to force a cascading delete. If the named task has any child
-    // tasks, and `force` is omitted or set to false, the deletion will fail. If
-    // `force` is set to true, the named task will be deleted along with all
-    // child tasks in a recursive fashion.
-    bool force = 2;
+  // Whether to force a cascading delete. If the named task has any child
+  // tasks, and `force` is omitted or set to false, the deletion will fail. If
+  // `force` is set to true, the named task will be deleted along with all
+  // child tasks in a recursive fashion.
+  bool force = 2;
 }
 
 message UndeleteTaskRequest {
-    // The name.
-    // Format: tasks/{task}
-    string name = 1;
+  // The name.
+  // Format: tasks/{task}
+  string name = 1;
 
-    // Whether to force a cascading undelete of ancestors. If the named task has
-    // at least one deleted ancestor, and `undelete_ancestors` is omitted or set
-    // to false, the undeletion will fail. If `undelete_ancestors` is set to
-    // true, the named task will be undeleted along with all deleted ancestors,
-    // direct or transitive.
-    bool undelete_ancestors = 2;
+  // Whether to force a cascading undelete of ancestors. If the named task has
+  // at least one deleted ancestor, and `undelete_ancestors` is omitted or set
+  // to false, the undeletion will fail. If `undelete_ancestors` is set to
+  // true, the named task will be undeleted along with all deleted ancestors,
+  // direct or transitive.
+  bool undelete_ancestors = 2;
 
-    // Whether to also undelete any deleted descendant (direct or transitive)
-    // tasks of the named task. Unlike `undelete_ancestors`, it is valid to omit
-    // `undelete_descendants` or set it to false even if the named task has
-    // deleted descendants.
-    bool undelete_descendants = 3;
+  // Whether to also undelete any deleted descendant (direct or transitive)
+  // tasks of the named task. Unlike `undelete_ancestors`, it is valid to omit
+  // `undelete_descendants` or set it to false even if the named task has
+  // deleted descendants.
+  bool undelete_descendants = 3;
 }
 
 message CompleteTaskRequest {
-    // The task to complete.
-    // Format: tasks/{task}
-    string name = 1;
+  // The task to complete.
+  // Format: tasks/{task}
+  string name = 1;
 
-    // Whether to force a cascading completion. If the named task has any child
-    // tasks that are not completed, and `force` is omitted or set to false, the
-    // completion will fail. If `force` is set to true, the task will be
-    // completed along with any uncompleted descendant tasks, direct or
-    // transitive.
-    bool force = 2;
+  // Whether to force a cascading completion. If the named task has any child
+  // tasks that are not completed, and `force` is omitted or set to false, the
+  // completion will fail. If `force` is set to true, the task will be
+  // completed along with any uncompleted descendant tasks, direct or
+  // transitive.
+  bool force = 2;
 }
 
 message ModifyTaskLabelsRequest {
-    // The task to modify labels for.
-    // Format: tasks/{task}
-    string name = 1;
+  // The task to modify labels for.
+  // Format: tasks/{task}
+  string name = 1;
 
-    // The names of labels to add. These labels are guaranteed to be present on
-    // the task when ModifyTaskLabels completes successfully. `add_labels` is
-    // treated like a set so specifying the same label multiple times is
-    // equivalent to specifying it once.
-    //
-    // If a label is present in both `add_labels` and `remove_labels` an error
-    // is returned.
-    //
-    // Format: labels/{label}
-    repeated string add_labels = 2;
+  // The names of labels to add. These labels are guaranteed to be present on
+  // the task when ModifyTaskLabels completes successfully. `add_labels` is
+  // treated like a set so specifying the same label multiple times is
+  // equivalent to specifying it once.
+  //
+  // If a label is present in both `add_labels` and `remove_labels` an error
+  // is returned.
+  //
+  // Format: labels/{label}
+  repeated string add_labels = 2;
 
-    // The names of labels to add. These labels are guaranteed to not be present
-    // on the task when ModifyTaskLabels completes successfully. `remove_labels`
-    // is treated like a set so specifying the same label multiple times is
-    // equivalent to specifying it once.
-    //
-    // If a label is present in both `add_labels` and `remove_labels` an error
-    // is returned.
-    //
-    // Format: labels/{label}
-    repeated string remove_labels = 3;
+  // The names of labels to add. These labels are guaranteed to not be present
+  // on the task when ModifyTaskLabels completes successfully. `remove_labels`
+  // is treated like a set so specifying the same label multiple times is
+  // equivalent to specifying it once.
+  //
+  // If a label is present in both `add_labels` and `remove_labels` an error
+  // is returned.
+  //
+  // Format: labels/{label}
+  repeated string remove_labels = 3;
 }
 
 message UncompleteTaskRequest {
-    // The task to uncomplete.
-    // Format: tasks/{task}
-    string name = 1;
+  // The task to uncomplete.
+  // Format: tasks/{task}
+  string name = 1;
 
-    // Whether to force a cascading uncompletion of ancestors. If the named task
-    // has at least one completed ancestor (direct or transitive), and
-    // `uncomplete_ancestors` is omitted or set to false, the undeletion will
-    // fail. If `uncomplete_ancestors` is set to true, the named task will be
-    // uncompleted along with all completed ancestors, direct or transitive.
-    bool uncomplete_ancestors = 2;
+  // Whether to force a cascading uncompletion of ancestors. If the named task
+  // has at least one completed ancestor (direct or transitive), and
+  // `uncomplete_ancestors` is omitted or set to false, the undeletion will
+  // fail. If `uncomplete_ancestors` is set to true, the named task will be
+  // uncompleted along with all completed ancestors, direct or transitive.
+  bool uncomplete_ancestors = 2;
 
-    // Whether to force a cascading uncompletion of descendants, direct or
-    // transitive. Unlike `uncomplete_ancestors` it is valid to either omit
-    // `undelete_descendants` or set it to false even if the task has
-    // uncompleted descendants.
-    bool uncomplete_descendants = 3;
+  // Whether to force a cascading uncompletion of descendants, direct or
+  // transitive. Unlike `uncomplete_ancestors` it is valid to either omit
+  // `undelete_descendants` or set it to false even if the task has
+  // uncompleted descendants.
+  bool uncomplete_descendants = 3;
 }
 
 message GetProjectRequest {
-    // The name.
-    // Format: projects/{project}
-    string name = 1;
+  // The name.
+  // Format: projects/{project}
+  string name = 1;
 }
 
 message CreateProjectRequest {
-    // The project to be created. The `name` field will be ignored. The `title`
-    // field must not be empty.
-    Project project = 1;
+  // The project to be created. The `name` field will be ignored. The `title`
+  // field must not be empty.
+  Project project = 1;
 }
 
 message ListProjectsRequest {
-    // The standard page size. Optional. If unspecified, the server will choose
-    // a suitable default. Values larger than 1000 will be truncated to 1000.
-    int32 page_size = 1;
+  // The standard page size. Optional. If unspecified, the server will choose
+  // a suitable default. Values larger than 1000 will be truncated to 1000.
+  int32 page_size = 1;
 
-    // The standard page token. Optional. Get the values from responses to
-    // ListProjects.
-    string page_token = 2;
+  // The standard page token. Optional. Get the values from responses to
+  // ListProjects.
+  string page_token = 2;
 
-    // Whether soft deleted resources should be included in the response.
-    bool show_deleted = 3;
+  // Whether soft deleted resources should be included in the response.
+  bool show_deleted = 3;
 }
 
 message ListProjectsResponse {
-    // The projects.
-    repeated Project projects = 1;
+  // The projects.
+  repeated Project projects = 1;
 
-    // The token required to get the next page in a subsequent call to
-    // ListProjects.
-    string next_page_token = 2;
+  // The token required to get the next page in a subsequent call to
+  // ListProjects.
+  string next_page_token = 2;
 }
 
 message UpdateProjectRequest {
-    // The project to be updated. The `name` field is used to specify which
-    // project to update. Only fields with non-default values will be updated,
-    // as long as they are specified in `update_mask`.
-    Project project = 1;
+  // The project to be updated. The `name` field is used to specify which
+  // project to update. Only fields with non-default values will be updated,
+  // as long as they are specified in `update_mask`.
+  Project project = 1;
 
-    // A field mask of which fields to update. A nil or empty field mask will be
-    // interpreted as updating all fields specified in `project`. Specifying a
-    // single `*` means doing a full replacement of the project.
-    google.protobuf.FieldMask update_mask = 2;
+  // A field mask of which fields to update. A nil or empty field mask will be
+  // interpreted as updating all fields specified in `project`. Specifying a
+  // single `*` means doing a full replacement of the project.
+  google.protobuf.FieldMask update_mask = 2;
 }
 
 message DeleteProjectRequest {
-    // The name.
-    // Format: projects/{project}
-    string name = 1;
+  // The name.
+  // Format: projects/{project}
+  string name = 1;
 }
 
 message UndeleteProjectRequest {
-    // The name.
-    // Format: projects/{project}
-    string name = 1;
+  // The name.
+  // Format: projects/{project}
+  string name = 1;
 }
 
 message ArchiveProjectRequest {
-    // The name.
-    // Format: projects/{project}
-    string name = 1;
+  // The name.
+  // Format: projects/{project}
+  string name = 1;
 }
 
 message UnarchiveProjectRequest {
-    // The name.
-    // Format: projects/{project}
-    string name = 1;
+  // The name.
+  // Format: projects/{project}
+  string name = 1;
 }
 
 message GetLabelRequest {
-    // The name.
-    // Format: labels/{label}
-    string name = 1;
+  // The name.
+  // Format: labels/{label}
+  string name = 1;
 }
 
 message CreateLabelRequest {
-    // The label to be created. The `name` field will be ignored. The `label`
-    // field must not be empty.
-    Label label = 1;
+  // The label to be created. The `name` field will be ignored. The `label`
+  // field must not be empty.
+  Label label = 1;
 }
 
 message ListLabelsRequest {
-    // The standard page size. Optional. If unspecified, the server will choose
-    // a suitable default. Values larger than 1000 will be truncated to 1000.
-    int32 page_size = 1;
+  // The standard page size. Optional. If unspecified, the server will choose
+  // a suitable default. Values larger than 1000 will be truncated to 1000.
+  int32 page_size = 1;
 
-    // The standard page token. Optional. Get the values from responses to
-    // ListLabels.
-    string page_token = 2;
+  // The standard page token. Optional. Get the values from responses to
+  // ListLabels.
+  string page_token = 2;
 }
 
 message ListLabelsResponse {
-    // The labels.
-    repeated Label labels = 1;
+  // The labels.
+  repeated Label labels = 1;
 
-    // The token required to get the next page in a subsequent call to
-    // ListLabels.
-    string next_page_token = 2;
+  // The token required to get the next page in a subsequent call to
+  // ListLabels.
+  string next_page_token = 2;
 }
 
 message UpdateLabelRequest {
-    // The label to be updated. The `name` field is used to specify which
-    // label to update. Only fields with non-default values will be updated,
-    // as long as they are specified in `update_mask`.
-    Label label = 1;
+  // The label to be updated. The `name` field is used to specify which
+  // label to update. Only fields with non-default values will be updated,
+  // as long as they are specified in `update_mask`.
+  Label label = 1;
 
-    // A field mask of which fields to update. A nil or empty field mask will be
-    // interpreted as updating all fields specified in `label`. Specifying a
-    // single `*` means doing a full replacement of the label.
-    google.protobuf.FieldMask update_mask = 2;
+  // A field mask of which fields to update. A nil or empty field mask will be
+  // interpreted as updating all fields specified in `label`. Specifying a
+  // single `*` means doing a full replacement of the label.
+  google.protobuf.FieldMask update_mask = 2;
 }
 
 message DeleteLabelRequest {
-    // The name.
-    // Format: labels/{label}
-    string name = 1;
+  // The name.
+  // Format: labels/{label}
+  string name = 1;
 }
