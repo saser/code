@@ -12,75 +12,75 @@ import (
 const d = 2
 
 func init() {
-	grpclog.SetLoggerV2(&glogger{})
+	grpclog.SetLoggerV2(&klogger{})
 }
 
-type glogger struct{}
+type klogger struct{}
 
-func (g *glogger) Info(args ...interface{}) {
+func (g *klogger) Info(args ...interface{}) {
 	klog.InfoDepth(d, args...)
 }
 
-func (g *glogger) Infoln(args ...interface{}) {
+func (g *klogger) Infoln(args ...interface{}) {
 	klog.InfoDepth(d, fmt.Sprintln(args...))
 }
 
-func (g *glogger) Infof(format string, args ...interface{}) {
+func (g *klogger) Infof(format string, args ...interface{}) {
 	klog.InfoDepth(d, fmt.Sprintf(format, args...))
 }
 
-func (g *glogger) InfoDepth(depth int, args ...interface{}) {
+func (g *klogger) InfoDepth(depth int, args ...interface{}) {
 	klog.InfoDepth(depth+d, args...)
 }
 
-func (g *glogger) Warning(args ...interface{}) {
+func (g *klogger) Warning(args ...interface{}) {
 	klog.WarningDepth(d, args...)
 }
 
-func (g *glogger) Warningln(args ...interface{}) {
+func (g *klogger) Warningln(args ...interface{}) {
 	klog.WarningDepth(d, fmt.Sprintln(args...))
 }
 
-func (g *glogger) Warningf(format string, args ...interface{}) {
+func (g *klogger) Warningf(format string, args ...interface{}) {
 	klog.WarningDepth(d, fmt.Sprintf(format, args...))
 }
 
-func (g *glogger) WarningDepth(depth int, args ...interface{}) {
+func (g *klogger) WarningDepth(depth int, args ...interface{}) {
 	klog.WarningDepth(depth+d, args...)
 }
 
-func (g *glogger) Error(args ...interface{}) {
+func (g *klogger) Error(args ...interface{}) {
 	klog.ErrorDepth(d, args...)
 }
 
-func (g *glogger) Errorln(args ...interface{}) {
+func (g *klogger) Errorln(args ...interface{}) {
 	klog.ErrorDepth(d, fmt.Sprintln(args...))
 }
 
-func (g *glogger) Errorf(format string, args ...interface{}) {
+func (g *klogger) Errorf(format string, args ...interface{}) {
 	klog.ErrorDepth(d, fmt.Sprintf(format, args...))
 }
 
-func (g *glogger) ErrorDepth(depth int, args ...interface{}) {
+func (g *klogger) ErrorDepth(depth int, args ...interface{}) {
 	klog.ErrorDepth(depth+d, args...)
 }
 
-func (g *glogger) Fatal(args ...interface{}) {
+func (g *klogger) Fatal(args ...interface{}) {
 	klog.FatalDepth(d, args...)
 }
 
-func (g *glogger) Fatalln(args ...interface{}) {
+func (g *klogger) Fatalln(args ...interface{}) {
 	klog.FatalDepth(d, fmt.Sprintln(args...))
 }
 
-func (g *glogger) Fatalf(format string, args ...interface{}) {
+func (g *klogger) Fatalf(format string, args ...interface{}) {
 	klog.FatalDepth(d, fmt.Sprintf(format, args...))
 }
 
-func (g *glogger) FatalDepth(depth int, args ...interface{}) {
+func (g *klogger) FatalDepth(depth int, args ...interface{}) {
 	klog.FatalDepth(depth+d, args...)
 }
 
-func (g *glogger) V(l int) bool {
+func (g *klogger) V(l int) bool {
 	return klog.V(klog.Level(l)).Enabled()
 }
