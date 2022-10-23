@@ -2646,6 +2646,25 @@ func (s *Suite) TestModifyTaskLabels() {
 			},
 		},
 		{
+			name: "NoChanges",
+			createReq: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title: "Some labels",
+					Labels: []string{
+						email.GetName(),
+						home.GetName(),
+						waiting.GetName(),
+					},
+				},
+			},
+			modifyReq: &pb.ModifyTaskLabelsRequest{},
+			want: []string{
+				waiting.GetName(),
+				email.GetName(),
+				home.GetName(),
+			},
+		},
+		{
 			name: "RemoveOne",
 			createReq: &pb.CreateTaskRequest{
 				Task: &pb.Task{
