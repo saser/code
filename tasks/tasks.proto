@@ -98,39 +98,44 @@ message Task {
   // Format: tasks/{task}
   string name = 1;
 
+  // The project this task belongs to. Optional. Used to organize tasks into a
+  // top-level project according to the GTD concept of a project.
+  // Format: projects/{project}
+  string project = 2;
+
   // The task under which this task is ordered. Optional. Used to build up a
   // hierarchy of tasks.
   // Format: tasks/{task}
-  string parent = 2;
+  string parent = 3;
 
   // The title of the task. Must be a short string.
-  string title = 3;
+  string title = 4;
 
   // The description of the task. Can be a long string. Not all tasks have
   // descriptions.
-  string description = 4;
+  string description = 5;
 
   // The set of labels attached to the task. Use ModifyTaskLabels to change
   // this set. As this is a set, each value only occurs once and the order is
   // undefined.
   // Format: labels/{label}
-  repeated string labels = 5;
+  repeated string labels = 6;
 
   // When the task was completed. A task is considered completed if any only
   // if this is a valid timestamp.
-  google.protobuf.Timestamp complete_time = 6;
+  google.protobuf.Timestamp complete_time = 7;
 
   // When the task was created.
-  google.protobuf.Timestamp create_time = 7;
+  google.protobuf.Timestamp create_time = 8;
 
   // When the task was last updated, if ever.
-  google.protobuf.Timestamp update_time = 8;
+  google.protobuf.Timestamp update_time = 9;
 
   // When the task was last soft deleted, if ever.
-  google.protobuf.Timestamp delete_time = 9;
+  google.protobuf.Timestamp delete_time = 10;
 
   // When the task will be permanently deleted after being soft deleted.
-  google.protobuf.Timestamp expire_time = 10;
+  google.protobuf.Timestamp expire_time = 11;
 }
 
 // A project is a container of tasks. Projects map to the GTD concept of a
