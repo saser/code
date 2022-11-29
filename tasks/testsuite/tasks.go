@@ -610,6 +610,74 @@ func (s *Suite) TestCreateTask() {
 	}
 }
 
+func (s *Suite) TestCreateTask_InProject() {
+	t := s.T()
+	ctx := context.Background()
+
+	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+		Project: &pb.Project{
+			Title: "Conquer the world",
+		},
+	})
+	req := &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Project: project.GetName(),
+			Title:   "Step 1: look up what 'conquer' means",
+		},
+	}
+	if _, err := s.client.CreateTask(ctx, req); err != nil {
+		t.Fatalf("CreateTask(%v) err = %v; want nil", req, err)
+	}
+}
+
+func (s *Suite) TestCreateTask_InArchivedProject() {
+	t := s.T()
+	ctx := context.Background()
+
+	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+		Project: &pb.Project{
+			Title: "Conquer the world",
+		},
+	})
+	project = s.client.ArchiveProjectT(ctx, t, &pb.ArchiveProjectRequest{
+		Name: project.GetName(),
+	})
+	req := &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Project: project.GetName(),
+			Title:   "Step 1: look up what 'conquer' means",
+		},
+	}
+	_, err := s.client.CreateTask(ctx, req)
+	if got, want := status.Code(err), codes.FailedPrecondition; got != want {
+		t.Errorf("CreateTask(%v) err = %v; want code %v", req, err, want)
+	}
+}
+
+func (s *Suite) TestCreateTask_InDeletedProject() {
+	t := s.T()
+	ctx := context.Background()
+
+	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+		Project: &pb.Project{
+			Title: "Conquer the world",
+		},
+	})
+	project = s.client.DeleteProjectT(ctx, t, &pb.DeleteProjectRequest{
+		Name: project.GetName(),
+	})
+	req := &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Project: project.GetName(),
+			Title:   "Step 1: look up what 'conquer' means",
+		},
+	}
+	_, err := s.client.CreateTask(ctx, req)
+	if got, want := status.Code(err), codes.NotFound; got != want {
+		t.Errorf("CreateTask(%v) err = %v; want code %v", req, err, want)
+	}
+}
+
 func (s *Suite) TestCreateTask_WithParent() {
 	t := s.T()
 	ctx := context.Background()
@@ -637,6 +705,68 @@ func (s *Suite) TestCreateTask_WithParent() {
 	}
 	if diff := cmp.Diff(child, got, protocmp.Transform(), protocmp.IgnoreFields(child, "name", "create_time")); diff != "" {
 		t.Errorf("CreateTask(%v): unexpected result (-want +got)\n%s", req, diff)
+	}
+}
+
+func (s *Suite) TestCreateTask_WithParentInAnotherProject() {
+	t := s.T()
+	ctx := context.Background()
+
+	// We create two projects: one for the parent task, and one that the child
+	// task should attempt to be created within.
+	parentProject := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+		Project: &pb.Project{
+			Title: "Parent's project",
+		},
+	})
+	childProject := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+		Project: &pb.Project{
+			Title: "Child's project",
+		},
+	})
+
+	// Now create the parent task, living in someProject.
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:   "Parent task",
+			Project: parentProject.GetName(),
+		},
+	})
+
+	for _, tt := range []struct {
+		name string
+		req  *pb.CreateTaskRequest
+		want codes.Code
+	}{
+		{
+			name: "InAnotherProject",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Project: childProject.GetName(),
+					Parent:  parent.GetName(),
+					Title:   "Child in another project",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "WithoutProject",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Project: "",
+					Parent:  parent.GetName(),
+					Title:   "Child without project",
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.client.CreateTask(ctx, tt.req)
+			if got, want := status.Code(err), tt.want; got != want {
+				t.Errorf("CreateTask(%v) err = %v; want code %v", tt.req, err, want)
+			}
+		})
 	}
 }
 
@@ -784,6 +914,16 @@ func (s *Suite) TestCreateTask_Error() {
 					Labels: []string{
 						"labels/1827179", // Very unlikely to exist.
 					},
+				},
+			},
+			want: codes.NotFound,
+		},
+		{
+			name: "MissingProject",
+			req: &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:   "Empty label",
+					Project: "projects/128391", // Very unlikely to exist.
 				},
 			},
 			want: codes.NotFound,
