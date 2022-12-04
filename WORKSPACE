@@ -79,3 +79,90 @@ container_pull(
     registry = "index.docker.io",
     repository = "library/hello-world",
 )
+
+BAZEL_TOOLCHAIN_TAG = "0.7.2"
+
+BAZEL_TOOLCHAIN_SHA = "f7aa8e59c9d3cafde6edb372d9bd25fb4ee7293ab20b916d867cd0baaa642529"
+
+http_archive(
+    name = "com_grail_bazel_toolchain",
+    canonical_id = BAZEL_TOOLCHAIN_TAG,
+    sha256 = BAZEL_TOOLCHAIN_SHA,
+    strip_prefix = "bazel-toolchain-{tag}".format(tag = BAZEL_TOOLCHAIN_TAG),
+    url = "https://github.com/grailbio/bazel-toolchain/archive/{tag}.tar.gz".format(tag = BAZEL_TOOLCHAIN_TAG),
+)
+
+load("@com_grail_bazel_toolchain//toolchain:deps.bzl", "bazel_toolchain_dependencies")
+
+bazel_toolchain_dependencies()
+
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
+
+llvm_toolchain(
+    name = "llvm_toolchain",
+    # Version 14.0.0 is also available, but I can't seem to get it to work. I
+    # get errors complaining about zlib not being available.
+    # https://stackoverflow.com/questions/72230186/clang-14-warning-cannot-compress-debug-sections-zlib-not-installed-wdebug
+    # makes it seem like version 14.0.0 was built improperly, and the easiest
+    # solution is just to fall back to the previous working version, which was
+    # 13.0.0. Another workaround would be to install Clang on the system and not
+    # configure the toolchain in Bazel, but I'm trading off having a later
+    # version for reproducibility.
+    llvm_version = "13.0.0",
+)
+
+load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
+
+llvm_register_toolchains()
+
+http_archive(
+    name = "hedron_compile_commands",
+    sha256 = "1e9a72130f8cc7e52dc6e05baa7f1d690c699397dde56ac0fb9c15b98d168f08",
+    strip_prefix = "bazel-compile-commands-extractor-1f154d0e1aaadb92aa25e901004b4c018eebbfc3",
+    url = "https://github.com/hedronvision/bazel-compile-commands-extractor/archive/1f154d0e1aaadb92aa25e901004b4c018eebbfc3.tar.gz",
+)
+
+load("@hedron_compile_commands//:workspace_setup.bzl", "hedron_compile_commands_setup")
+
+hedron_compile_commands_setup()
+
+http_archive(
+    name = "rules_cc",
+    sha256 = "af6cc82d87db94585bceeda2561cb8a9d55ad435318ccb4ddfee18a43580fb5d",
+    strip_prefix = "rules_cc-0.0.4",
+    urls = ["https://github.com/bazelbuild/rules_cc/releases/download/0.0.4/rules_cc-0.0.4.tar.gz"],
+)
+
+http_archive(
+    name = "com_google_googletest",
+    sha256 = "28744548b5c6dcd70b69dddba8ebb1c8623ace5dbe4e4457541f704290052957",
+    strip_prefix = "googletest-a16bfcfda1ea994c1abec23cca8f530953042dfa",
+    urls = ["https://github.com/google/googletest/archive/a16bfcfda1ea994c1abec23cca8f530953042dfa.zip"],
+)
+
+http_archive(
+    name = "com_github_google_benchmark",
+    sha256 = "6430e4092653380d9dc4ccb45a1e2dc9259d581f4866dc0759713126056bc1d7",
+    strip_prefix = "benchmark-1.7.1",
+    urls = ["https://github.com/google/benchmark/archive/refs/tags/v1.7.1.tar.gz"],
+)
+
+http_archive(
+    name = "com_google_absl",
+    sha256 = "8964b0abac57f94f4ddc3a1dcd8565e5fa5edd1620e326d931c1eabeb9267977",
+    strip_prefix = "abseil-cpp-4e5ff1559ca3bd7bb777a1c48106464cb656e041",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/4e5ff1559ca3bd7bb777a1c48106464cb656e041.zip"],
+)
+
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "74d544d96f4a5bb630d465ca8bbcfe231e3594e5aae57e1edbf17a6eb3ca2506",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.3.0/bazel-skylib-1.3.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.3.0/bazel-skylib-1.3.0.tar.gz",
+    ],
+)
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()

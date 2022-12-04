@@ -9,6 +9,7 @@ include tools.mk
 go_module := go.saser.se
 
 build_files := $(shell git ls-files -- 'WORKSPACE' '**/BUILD.bazel' '*.bzl')
+cc_files := $(shell git ls-files -- '*.cc' '*.h')
 go_files := $(shell git ls-files -- '*.go')
 proto_files := $(shell git ls-files -- '*.proto')
 
@@ -41,12 +42,13 @@ fix: \
 .PHONY: fix-clang-format
 fix-clang-format: \
 	$(clang-format) \
+	$(cc_files) \
 	$(proto_files)
 fix-clang-format:
 	$(clang-format) \
 		--Werror \
 		-i \
-		--style=google \
+		$(cc_files) \
 		$(proto_files)
 
 .PHONY: fix-buildifier

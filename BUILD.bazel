@@ -1,6 +1,7 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 
 # gazelle:exclude _tools
+# gazelle:exclude external
 # gazelle:prefix go.saser.se
 # gazelle:proto disable_global
 gazelle(

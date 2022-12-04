@@ -1,0 +1,10 @@
+---
+BasedOnStyle: Google
+---
+Language: Cpp
+# Generally, the benchmarks I write are similar to unit tests, in that
+# foo/bar_benchmark.cc contains benchmarks for functions in foo/bar.h. This line
+# makes clang-format consider foo/bar.h to be the "main" header for
+# foo/bar_benchmark.cc and puts the #include at the top of the file, similar to
+# how it's done in unit tests.
+IncludeIsMainRegex: '([-_](test|unittest|benchmark))?$'
