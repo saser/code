@@ -1,0 +1,17 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "trim",
+    srcs = ["trim.cc"],
+    hdrs = ["trim.h"],
+    deps = ["@com_google_absl//absl/strings"],
+)
+
+cc_test(
+    name = "trim_test",
+    srcs = ["trim_test.cc"],
+    deps = [
+        ":trim",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
