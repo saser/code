@@ -34,3 +34,38 @@ cc_binary(
         "@com_github_google_benchmark//:benchmark",
     ],
 )
+
+cc_library(
+    name = "day02",
+    srcs = ["day02.cc"],
+    hdrs = ["day02.h"],
+    deps = [
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "day02_test",
+    srcs = ["day02_test.cc"],
+    data = [
+        "//adventofcode/data/year2022:day02.example.in",
+        "//adventofcode/data/year2022:day02.real.in",
+    ],
+    deps = [
+        ":day02",
+        "//runfiles/cc:runfiles",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_binary(
+    name = "day02_benchmark",
+    srcs = ["day02_benchmark.cc"],
+    data = ["//adventofcode/data/year2022:day02.real.in"],
+    deps = [
+        ":day02",
+        "//runfiles/cc:runfiles",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
