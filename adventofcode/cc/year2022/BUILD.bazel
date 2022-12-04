@@ -1,0 +1,36 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
+cc_library(
+    name = "day01",
+    srcs = ["day01.cc"],
+    hdrs = ["day01.h"],
+    deps = [
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "day01_test",
+    srcs = ["day01_test.cc"],
+    data = [
+        "//adventofcode/data/year2022:day01.example.in",
+        "//adventofcode/data/year2022:day01.real.in",
+    ],
+    deps = [
+        ":day01",
+        "//runfiles/cc:runfiles",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_binary(
+    name = "day01_benchmark",
+    srcs = ["day01_benchmark.cc"],
+    data = ["//adventofcode/data/year2022:day01.real.in"],
+    deps = [
+        ":day01",
+        "//runfiles/cc:runfiles",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
