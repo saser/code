@@ -1,5 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
+package(default_visibility = ["//adventofcode/cc:__subpackages__"])
+
 cc_library(
     name = "trim",
     srcs = ["trim.cc"],

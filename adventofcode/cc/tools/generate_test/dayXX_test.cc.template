@@ -1,0 +1,50 @@
+#include "{{.HeaderFile}}"
+
+#include <utility>
+
+#include "adventofcode/cc/trim.h"
+#include "gtest/gtest.h"
+
+class Part1Test
+    : public testing::TestWithParam<std::pair<const char *, const char *>> {};
+
+TEST_P(Part1Test, Solve) {
+  const auto in_out = GetParam();
+  const auto input = in_out.first;
+  const auto want = in_out.second;
+  const auto got = {{.Namespace}}::{{.Part1Func}}(input);
+  ASSERT_TRUE(got.ok()) << "Solve: " << got.status();
+  EXPECT_EQ(*got, adventofcode::cc::trim::TrimSpace(want));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Instances, Part1Test,
+    testing::Values(
+        {{- range $i, $pair := .Part1Pairs }}
+        {{ if $i }},
+        {{ end -}}
+        std::pair(R"({{.In}})",
+                  R"({{.Out}})")
+        {{ end -}}));
+
+class Part2Test
+    : public testing::TestWithParam<std::pair<const char *, const char *>> {};
+
+TEST_P(Part2Test, Solve) {
+  const auto in_out = GetParam();
+  const auto input = in_out.first;
+  const auto want = in_out.second;
+  const auto got = {{.Namespace}}::{{.Part2Func}}(input);
+  ASSERT_TRUE(got.ok()) << "Solve: " << got.status();
+  EXPECT_EQ(*got, adventofcode::cc::trim::TrimSpace(want));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Instances, Part2Test,
+    testing::Values(
+        {{- range $i, $pair := .Part2Pairs }}
+        {{ if $i }},
+        {{ end -}}
+        std::pair(R"({{.In}})",
+                  R"({{.Out}})")
+        {{ end -}}));
