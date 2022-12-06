@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "generate_benchmark_lib",
+    srcs = ["main.go"],
+    embedsrcs = ["dayXX_benchmark.cc.template"],
+    importpath = "go.saser.se/adventofcode/cc/tools/generate_benchmark",
+    visibility = ["//visibility:private"],
+    deps = ["@io_k8s_klog_v2//:klog"],
+)
+
+go_binary(
+    name = "generate_benchmark",
+    embed = [":generate_benchmark_lib"],
+    visibility = ["//visibility:public"],
+)

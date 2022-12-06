@@ -1,6 +1,6 @@
-"""cc_aoc_test : generate unit tests for C++ solutions."""
+"""build_defs : generate unit tests and benchmarks for C++ solutions."""
 
-load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_test")
 
 def _canonical_target(target):
     # Assume that all targets that start with ":" are targets in the same
@@ -124,6 +124,86 @@ def cc_aoc_test(
         deps = [library] + [
             "//adventofcode/cc:trim",
             "@com_google_googletest//:gtest_main",
+        ],
+        srcs = [output],
+    )
+
+def cc_aoc_benchmark(
+        name,
+        library,
+        header_file = "",
+        namespace = "",
+        part1_func = "Part1",
+        part2_func = "Part2",
+        inputs = []):
+    """Generates a `cc_binary` target for running benchmarks.
+
+    Args:
+        name: string. Name of the test target.
+        library: label. The `cc_library` target containing the solution.
+        header_file: string. That which should be #include-d as the main module
+            in the test. If empty, it will be derived from `library`: if the
+            BUILD target of `library` is "//path/to:day01", `header_file` will
+            be "path/to/day01.h".
+        namespace: string. In which the solution functions live. If empty, it
+            will be derived from `header_file`: if `header_file` is
+            "path/to/day01.h", `namespace` will be "path::to::day01".
+        part1_func: string. The function within `namespace` solving part 1.
+        part2_func: string. The function within `namespace` solving part 2.
+        inputs: []label. Files containing inputs. Each input will be used to
+            benchmark both the part 1 and part 2 solutions."""
+
+    library = _canonical_target(library)
+
+    if not header_file:
+        # Split "//path/to:target" into dirs = ["path", "to:target"].
+        dirs = library[2:].split("/")
+
+        # Remove "to:target" from dirs and split into last = ["to", "target"].
+        last = dirs.pop().split(":")
+
+        # Append ".h" to last[-1] => last = ["to", "target.h"].
+        last[-1] += ".h"
+
+        # Join ["path"] + ["to", "target.h"] => "path/to/target.h".
+        header_file = "/".join(dirs + last)
+
+    if not namespace:
+        # Transform header_file = "path/to/target.h" into "path::to::target".
+        namespace = "::".join(header_file.removesuffix(".h").split("/"))
+
+    if not inputs:
+        fail("inputs must not be empty")
+
+    output = name + ".cc"
+    srcs = []
+    outs = [output]
+    cmd = [
+        "$(location //adventofcode/cc/tools/generate_benchmark)",
+        "--header_file='%s'" % header_file,
+        "--namespace='%s'" % namespace,
+        "--part1_func='%s'" % part1_func,
+        "--part2_func='%s'" % part2_func,
+        "--output='$(location %s)'" % output,
+    ]
+
+    inputs_arg = ",".join(["$(location %s)" % t for t in inputs])
+    cmd.append("--inputs='%s'" % inputs_arg)
+    srcs = inputs
+
+    native.genrule(
+        name = name + "_cc",
+        srcs = srcs,
+        outs = outs,
+        cmd = " ".join(cmd),
+        exec_tools = ["//adventofcode/cc/tools/generate_benchmark"],
+    )
+
+    cc_binary(
+        name = name,
+        deps = [library] + [
+            "@com_github_google_benchmark//:benchmark_main",
+            "@com_google_absl//absl/strings",
         ],
         srcs = [output],
     )

@@ -1,0 +1,22 @@
+#include "{{.HeaderFile}}"
+
+#include "absl/strings/string_view.h"
+#include "benchmark/benchmark.h"
+
+static void BM_Part1(benchmark::State& state, absl::string_view input) {
+  for (auto _ : state) {
+    benchmark::DoNotOptimize({{.Namespace}}::{{.Part1Func}}(input));
+  }
+}
+{{- range .Inputs }}
+BENCHMARK_CAPTURE(BM_Part1, {{.File}}, R"({{.Input}})");
+{{- end}}
+
+static void BM_Part2(benchmark::State& state, absl::string_view input) {
+  for (auto _ : state) {
+    benchmark::DoNotOptimize({{.Namespace}}::{{.Part2Func}}(input));
+  }
+}
+{{- range .Inputs }}
+BENCHMARK_CAPTURE(BM_Part2, {{.File}}, R"({{.Input}})");
+{{- end}}
