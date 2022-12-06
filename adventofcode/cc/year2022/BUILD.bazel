@@ -1,5 +1,5 @@
-load("//adventofcode/cc/tools:build_defs.bzl", "cc_aoc_test")
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("//adventofcode/cc/tools:build_defs.bzl", "cc_aoc_benchmark", "cc_aoc_test")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
     name = "day01",
@@ -24,15 +24,10 @@ cc_aoc_test(
     },
 )
 
-cc_binary(
+cc_aoc_benchmark(
     name = "day01_benchmark",
-    srcs = ["day01_benchmark.cc"],
-    data = ["//adventofcode/data/year2022:day01.real.in"],
-    deps = [
-        ":day01",
-        "//runfiles/cc:runfiles",
-        "@com_github_google_benchmark//:benchmark",
-    ],
+    inputs = ["//adventofcode/data/year2022:day01.real.in"],
+    library = ":day01",
 )
 
 cc_library(
@@ -58,13 +53,8 @@ cc_aoc_test(
     },
 )
 
-cc_binary(
+cc_aoc_benchmark(
     name = "day02_benchmark",
-    srcs = ["day02_benchmark.cc"],
-    data = ["//adventofcode/data/year2022:day02.real.in"],
-    deps = [
-        ":day02",
-        "//runfiles/cc:runfiles",
-        "@com_github_google_benchmark//:benchmark",
-    ],
+    inputs = ["//adventofcode/data/year2022:day02.real.in"],
+    library = ":day02",
 )
