@@ -1,5 +1,5 @@
-// Command generate_test generates a C++ source file implementing a unit test
-// for Advent of Code solutions.
+// Command generate_benchmark generates a C++ source file implementing a
+// microbenchmark for Advent of Code solutions.
 package main
 
 import (
