@@ -147,3 +147,40 @@ cc_aoc_benchmark(
     inputs = ["//adventofcode/data/year2022:day05.real.in"],
     library = ":day05",
 )
+
+cc_library(
+    name = "day06",
+    srcs = ["day06.cc"],
+    hdrs = ["day06.h"],
+    deps = [
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_aoc_test(
+    name = "day06_test",
+    library = ":day06",
+    part1 = {
+        "//adventofcode/data/year2022:day06.example1.in": "//adventofcode/data/year2022:day06.example1.part1.out",
+        "//adventofcode/data/year2022:day06.example2.in": "//adventofcode/data/year2022:day06.example2.part1.out",
+        "//adventofcode/data/year2022:day06.example3.in": "//adventofcode/data/year2022:day06.example3.part1.out",
+        "//adventofcode/data/year2022:day06.example4.in": "//adventofcode/data/year2022:day06.example4.part1.out",
+        "//adventofcode/data/year2022:day06.example5.in": "//adventofcode/data/year2022:day06.example5.part1.out",
+        "//adventofcode/data/year2022:day06.real.in": "//adventofcode/data/year2022:day06.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day06.example1.in": "//adventofcode/data/year2022:day06.example1.part2.out",
+        "//adventofcode/data/year2022:day06.example2.in": "//adventofcode/data/year2022:day06.example2.part2.out",
+        "//adventofcode/data/year2022:day06.example3.in": "//adventofcode/data/year2022:day06.example3.part2.out",
+        "//adventofcode/data/year2022:day06.example4.in": "//adventofcode/data/year2022:day06.example4.part2.out",
+        "//adventofcode/data/year2022:day06.example5.in": "//adventofcode/data/year2022:day06.example5.part2.out",
+        "//adventofcode/data/year2022:day06.real.in": "//adventofcode/data/year2022:day06.real.part2.out",
+    },
+)
+
+cc_aoc_benchmark(
+    name = "day06_benchmark",
+    inputs = ["//adventofcode/data/year2022:day06.real.in"],
+    library = ":day06",
+)
