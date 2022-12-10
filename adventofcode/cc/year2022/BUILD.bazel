@@ -87,3 +87,34 @@ cc_aoc_benchmark(
     inputs = ["//adventofcode/data/year2022:day03.real.in"],
     library = ":day03",
 )
+
+cc_library(
+    name = "day04",
+    srcs = ["day04.cc"],
+    hdrs = ["day04.h"],
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)
+
+cc_aoc_test(
+    name = "day04_test",
+    library = ":day04",
+    part1 = {
+        "//adventofcode/data/year2022:day04.example.in": "//adventofcode/data/year2022:day04.example.part1.out",
+        "//adventofcode/data/year2022:day04.real.in": "//adventofcode/data/year2022:day04.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day04.example.in": "//adventofcode/data/year2022:day04.example.part2.out",
+        "//adventofcode/data/year2022:day04.real.in": "//adventofcode/data/year2022:day04.real.part2.out",
+    },
+)
+
+cc_aoc_benchmark(
+    name = "day04_benchmark",
+    inputs = ["//adventofcode/data/year2022:day04.real.in"],
+    library = ":day04",
+)
