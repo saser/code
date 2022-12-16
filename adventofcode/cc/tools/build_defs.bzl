@@ -26,6 +26,56 @@ def _canonical_target(target):
     # "//path/to:target".
     return target
 
+def cc_aoc_header(
+        year,
+        day,
+        name = None,
+        part1 = True,
+        part2 = True):
+    """Generates a dayXX.h file.
+
+    Args:
+        year: int. The year. Must be 2015 or later.
+        day: int. The day. Must be in the range 1-25.
+        name: string. Name of the output file to generate. If empty it will be
+            "dayXX.h" where XX is equal to the day argument, possible with zero
+            padding.
+        part1: boolean. Whether to generate a part 1 function.
+        part2: boolean. Whether to generate a part 2 function."""
+
+    if year < 2015:
+        fail("year = %d; want 2015 or later" % year)
+
+    if day < 1 or day > 25:
+        fail("day = %d; want 1-25" % day)
+
+    if not name:
+        # It looks like Starlark's string formatting is less sophisticated than
+        # Python's, so I resort to this hack.
+        if day < 10:
+            name = "day0%d.h" % day
+        else:
+            name = "day%d.h" % day
+
+    srcs = []
+    outs = [name]
+    cmd = [
+        "$(location //adventofcode/cc/tools/generate_header)",
+        "--output='$(location %s)'" % name,
+        "--year=%d" % year,
+        "--day=%d" % day,
+        "--part1=%s" % part1,
+        "--part2=%s" % part2,
+    ]
+
+    native.genrule(
+        name = "_gen_" + name,
+        srcs = srcs,
+        outs = outs,
+        cmd = " ".join(cmd),
+        exec_tools = ["//adventofcode/cc/tools/generate_header"],
+    )
+
 def cc_aoc_test(
         name,
         library,

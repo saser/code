@@ -1,0 +1,24 @@
+#ifndef ADVENTOFCODE_CC_YEAR{{.Year}}_DAY{{printf "%02d" .Day}}_H_
+#define ADVENTOFCODE_CC_YEAR{{.Year}}_DAY{{printf "%02d" .Day}}_H_
+
+#include <string>
+
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+
+namespace adventofcode {
+namespace cc {
+namespace year{{.Year}} {
+namespace day{{printf "%02d" .Day}} {
+{{ if .Part1 -}}
+absl::StatusOr<std::string> Part1(absl::string_view input);
+{{- end }}
+{{ if .Part2 -}}
+absl::StatusOr<std::string> Part2(absl::string_view input);
+{{- end }}
+}  // namespace day{{printf "%02d" .Day}}
+}  // namespace year{{.Year}}
+}  // namespace cc
+}  // namespace adventofcode
+
+#endif
