@@ -38,8 +38,13 @@ cc_aoc_test(
 
 cc_aoc_benchmark(
     name = "day01_benchmark",
-    inputs = ["//adventofcode/data/year2022:day01.real.in"],
     library = ":day01",
+    part1 = {
+        "//adventofcode/data/year2022:day01.real.in": "//adventofcode/data/year2022:day01.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day01.real.in": "//adventofcode/data/year2022:day01.real.part2.out",
+    },
 )
 
 cc_library(
@@ -67,8 +72,13 @@ cc_aoc_test(
 
 cc_aoc_benchmark(
     name = "day02_benchmark",
-    inputs = ["//adventofcode/data/year2022:day02.real.in"],
     library = ":day02",
+    part1 = {
+        "//adventofcode/data/year2022:day02.real.in": "//adventofcode/data/year2022:day02.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day02.real.in": "//adventofcode/data/year2022:day02.real.part2.out",
+    },
 )
 
 cc_library(
@@ -96,8 +106,13 @@ cc_aoc_test(
 
 cc_aoc_benchmark(
     name = "day03_benchmark",
-    inputs = ["//adventofcode/data/year2022:day03.real.in"],
     library = ":day03",
+    part1 = {
+        "//adventofcode/data/year2022:day03.real.in": "//adventofcode/data/year2022:day03.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day03.real.in": "//adventofcode/data/year2022:day03.real.part2.out",
+    },
 )
 
 cc_library(
@@ -127,8 +142,13 @@ cc_aoc_test(
 
 cc_aoc_benchmark(
     name = "day04_benchmark",
-    inputs = ["//adventofcode/data/year2022:day04.real.in"],
     library = ":day04",
+    part1 = {
+        "//adventofcode/data/year2022:day04.real.in": "//adventofcode/data/year2022:day04.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day04.real.in": "//adventofcode/data/year2022:day04.real.part2.out",
+    },
 )
 
 cc_library(
@@ -156,8 +176,13 @@ cc_aoc_test(
 
 cc_aoc_benchmark(
     name = "day05_benchmark",
-    inputs = ["//adventofcode/data/year2022:day05.real.in"],
     library = ":day05",
+    part1 = {
+        "//adventofcode/data/year2022:day05.real.in": "//adventofcode/data/year2022:day05.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day05.real.in": "//adventofcode/data/year2022:day05.real.part2.out",
+    },
 )
 
 cc_library(
@@ -193,8 +218,13 @@ cc_aoc_test(
 
 cc_aoc_benchmark(
     name = "day06_benchmark",
-    inputs = ["//adventofcode/data/year2022:day06.real.in"],
     library = ":day06",
+    part1 = {
+        "//adventofcode/data/year2022:day06.real.in": "//adventofcode/data/year2022:day06.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day06.real.in": "//adventofcode/data/year2022:day06.real.part2.out",
+    },
 )
 
 cc_library(
@@ -222,8 +252,13 @@ cc_aoc_test(
 
 cc_aoc_benchmark(
     name = "day07_benchmark",
-    inputs = ["//adventofcode/data/year2022:day07.real.in"],
     library = ":day07",
+    part1 = {
+        "//adventofcode/data/year2022:day07.real.in": "//adventofcode/data/year2022:day07.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day07.real.in": "//adventofcode/data/year2022:day07.real.part2.out",
+    },
 )
 
 cc_library(
@@ -251,6 +286,11 @@ cc_aoc_test(
 
 cc_aoc_benchmark(
     name = "day08_benchmark",
-    inputs = ["//adventofcode/data/year2022:day08.real.in"],
     library = ":day08",
+    part1 = {
+        "//adventofcode/data/year2022:day08.real.in": "//adventofcode/data/year2022:day08.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day08.real.in": "//adventofcode/data/year2022:day08.real.part2.out",
+    },
 )

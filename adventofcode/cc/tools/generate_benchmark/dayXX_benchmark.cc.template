@@ -1,22 +1,40 @@
 #include "{{.HeaderFile}}"
 
+#include "adventofcode/cc/trim.h"
+
+#include "absl/status/statusor.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
 
-static void BM_Part1(benchmark::State& state, absl::string_view input) {
+static void BM_Part1(benchmark::State& state, absl::string_view input, absl::string_view want) {
+  absl::StatusOr<std::string> got = {{.Namespace}}::{{.Part1Func}}(input);
+  if (!got.ok()) {
+    state.SkipWithError(got.status().ToString().c_str());
+  }
+  if (*got != want) {
+    state.SkipWithError(absl::StrFormat("got \"%s\"; want \"%s\"", *got, want).c_str());
+  }
   for (auto _ : state) {
     benchmark::DoNotOptimize({{.Namespace}}::{{.Part1Func}}(input));
   }
 }
-{{- range .Inputs }}
-BENCHMARK_CAPTURE(BM_Part1, {{.File}}, R"({{.Input}})");
+{{- range .Part1Pairs }}
+BENCHMARK_CAPTURE(BM_Part1, {{.File}}, R"({{.Input}})", adventofcode::cc::trim::TrimSpace(R"({{.Output}})"));
 {{- end}}
 
-static void BM_Part2(benchmark::State& state, absl::string_view input) {
+static void BM_Part2(benchmark::State& state, absl::string_view input, absl::string_view want) {
+  absl::StatusOr<std::string> got = {{.Namespace}}::{{.Part2Func}}(input);
+  if (!got.ok()) {
+    state.SkipWithError(got.status().ToString().c_str());
+  }
+  if (*got != want) {
+    state.SkipWithError(absl::StrFormat("got \"%s\"; want \"%s\"", *got, want).c_str());
+  }
   for (auto _ : state) {
     benchmark::DoNotOptimize({{.Namespace}}::{{.Part2Func}}(input));
   }
 }
-{{- range .Inputs }}
-BENCHMARK_CAPTURE(BM_Part2, {{.File}}, R"({{.Input}})");
+{{- range .Part2Pairs }}
+BENCHMARK_CAPTURE(BM_Part2, {{.File}}, R"({{.Input}})", adventofcode::cc::trim::TrimSpace(R"({{.Output}})"));
 {{- end}}

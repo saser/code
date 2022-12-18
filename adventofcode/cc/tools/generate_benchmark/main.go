@@ -27,7 +27,8 @@ var (
 	namespaceFlag = flag.String("namespace", "", `The namespace in which the solver functions live. Should be double-colon-separated, e.g., "adventofcode::cc::year2022::day01". If left empty the value will be derived from the -header_file flag by replacing slashes with double colons and stripping the .h suffix, e.g., "adventofcode/cc/year2022/day01.h" => "adventofcode::cc::year2022::day01".`)
 	part1Func     = flag.String("part1_func", "Part1", "The name of the function solving part 1.")
 	part2Func     = flag.String("part2_func", "Part2", "The name of the function solving part 2.")
-	inputs        = flag.String("inputs", "", `Comma-separated list of file containing problem inputs.`)
+	part1Pairs    = flag.String("part1_pairs", "", `Comma-separated list of file pairs of the form "in_file:out_file" containing problem inputs and corresponding expected outputs.`)
+	part2Pairs    = flag.String("part2_pairs", "", `Comma-separated list of file pairs of the form "in_file:out_file" containing problem inputs and corresponding expected outputs.`)
 
 	output = flag.String("output", "", "Path to write the generated file to. Leaving this empty writes the file to stdout.")
 )
@@ -38,15 +39,16 @@ var (
 	tmpl        = template.Must(template.New("dayXX_benchmark.cc").Parse(rawTemplate))
 )
 
-type inputPair struct {
-	File, Input string
+type inOutPair struct {
+	File          string
+	Input, Output string
 }
 
 type templateArgs struct {
-	HeaderFile           string
-	Namespace            string
-	Part1Func, Part2Func string
-	Inputs               []inputPair
+	HeaderFile             string
+	Namespace              string
+	Part1Func, Part2Func   string
+	Part1Pairs, Part2Pairs []inOutPair
 }
 
 func errmain() error {
@@ -73,17 +75,49 @@ func errmain() error {
 	}
 	args.Part2Func = *part2Func
 
-	if *inputs == "" {
-		return errors.New("-inputs is required but was empty")
+	if *part1Pairs == "" {
+		return errors.New("-part1_pairs is required but was empty")
 	}
-	for _, file := range strings.Split(*inputs, ",") {
-		input, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("-inputs contained unreadable file: %v", err)
+	for _, pair := range strings.Split(*part1Pairs, ",") {
+		in, out, ok := strings.Cut(pair, ":")
+		if !ok {
+			return fmt.Errorf("-part1_pairs contains invalid element %q", pair)
 		}
-		args.Inputs = append(args.Inputs, inputPair{
-			File:  filepath.Base(file),
-			Input: string(input),
+		inData, err := os.ReadFile(in)
+		if err != nil {
+			return fmt.Errorf("-part1_pairs contained unreadable file: %v", err)
+		}
+		outData, err := os.ReadFile(out)
+		if err != nil {
+			return fmt.Errorf("-part1_pairs contained unreadable file: %v", err)
+		}
+		args.Part1Pairs = append(args.Part1Pairs, inOutPair{
+			File:   filepath.Base(in),
+			Input:  string(inData),
+			Output: string(outData),
+		})
+	}
+
+	if *part2Pairs == "" {
+		return errors.New("-part2_pairs is required but was empty")
+	}
+	for _, pair := range strings.Split(*part2Pairs, ",") {
+		in, out, ok := strings.Cut(pair, ":")
+		if !ok {
+			return fmt.Errorf("-part2_pairs contains invalid element %q", pair)
+		}
+		inData, err := os.ReadFile(in)
+		if err != nil {
+			return fmt.Errorf("-part2_pairs contained unreadable file: %v", err)
+		}
+		outData, err := os.ReadFile(out)
+		if err != nil {
+			return fmt.Errorf("-part2_pairs contained unreadable file: %v", err)
+		}
+		args.Part2Pairs = append(args.Part2Pairs, inOutPair{
+			File:   filepath.Base(in),
+			Input:  string(inData),
+			Output: string(outData),
 		})
 	}
 

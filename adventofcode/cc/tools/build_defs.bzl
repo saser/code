@@ -185,7 +185,8 @@ def cc_aoc_benchmark(
         namespace = "",
         part1_func = "Part1",
         part2_func = "Part2",
-        inputs = []):
+        part1 = {},
+        part2 = {}):
     """Generates a `cc_binary` target for running benchmarks.
 
     Args:
@@ -200,8 +201,10 @@ def cc_aoc_benchmark(
             "path/to/day01.h", `namespace` will be "path::to::day01".
         part1_func: string. The function within `namespace` solving part 1.
         part2_func: string. The function within `namespace` solving part 2.
-        inputs: []label. Files containing inputs. Each input will be used to
-            benchmark both the part 1 and part 2 solutions."""
+        part1: map[label]label. Keys are files containing inputs, values are
+            files containing corresponding expected outputs. Must not be empty.
+        part2: map[label]label. Keys are files containing inputs, values are
+            files containing corresponding expected outputs. Must not be empty."""
 
     library = _canonical_target(library)
 
@@ -222,8 +225,11 @@ def cc_aoc_benchmark(
         # Transform header_file = "path/to/target.h" into "path::to::target".
         namespace = "::".join(header_file.removesuffix(".h").split("/"))
 
-    if not inputs:
-        fail("inputs must not be empty")
+    if not part1:
+        fail("part1_pairs must not be empty")
+
+    if not part2:
+        fail("part2_pairs must not be empty")
 
     output = name + ".cc"
     srcs = []
@@ -237,9 +243,25 @@ def cc_aoc_benchmark(
         "--output='$(location %s)'" % output,
     ]
 
-    inputs_arg = ",".join(["$(location %s)" % t for t in inputs])
-    cmd.append("--inputs='%s'" % inputs_arg)
-    srcs = inputs
+    part1_pairs = []
+    for in_file, out_file in part1.items():
+        part1_pairs.append("$(location %s):$(location %s)" % (in_file, out_file))
+        if in_file not in srcs:
+            srcs.append(in_file)
+        if out_file not in srcs:
+            srcs.append(out_file)
+    part1_pairs_arg = ",".join(part1_pairs)
+    cmd.append("--part1_pairs='%s'" % part1_pairs_arg)
+
+    part2_pairs = []
+    for in_file, out_file in part2.items():
+        part2_pairs.append("$(location %s):$(location %s)" % (in_file, out_file))
+        if in_file not in srcs:
+            srcs.append(in_file)
+        if out_file not in srcs:
+            srcs.append(out_file)
+    part2_pairs_arg = ",".join(part2_pairs)
+    cmd.append("--part2_pairs='%s'" % part2_pairs_arg)
 
     native.genrule(
         name = name + "_cc",
@@ -252,8 +274,11 @@ def cc_aoc_benchmark(
     cc_binary(
         name = name,
         deps = [library] + [
+            "//adventofcode/cc:trim",
             "@com_github_google_benchmark//:benchmark_main",
+            "@com_google_absl//absl/status:statusor",
             "@com_google_absl//absl/strings",
+            "@com_google_absl//absl/strings:str_format",
         ],
         srcs = [output],
     )
