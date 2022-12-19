@@ -11,9 +11,11 @@ static void BM_Part1(benchmark::State& state, absl::string_view input, absl::str
   absl::StatusOr<std::string> got = {{.Namespace}}::{{.Part1Func}}(input);
   if (!got.ok()) {
     state.SkipWithError(got.status().ToString().c_str());
+    return;
   }
   if (*got != want) {
     state.SkipWithError(absl::StrFormat("got \"%s\"; want \"%s\"", *got, want).c_str());
+    return;
   }
   for (auto _ : state) {
     benchmark::DoNotOptimize({{.Namespace}}::{{.Part1Func}}(input));
@@ -27,9 +29,11 @@ static void BM_Part2(benchmark::State& state, absl::string_view input, absl::str
   absl::StatusOr<std::string> got = {{.Namespace}}::{{.Part2Func}}(input);
   if (!got.ok()) {
     state.SkipWithError(got.status().ToString().c_str());
+    return;
   }
   if (*got != want) {
     state.SkipWithError(absl::StrFormat("got \"%s\"; want \"%s\"", *got, want).c_str());
+    return;
   }
   for (auto _ : state) {
     benchmark::DoNotOptimize({{.Namespace}}::{{.Part2Func}}(input));
