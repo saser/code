@@ -166,3 +166,10 @@ http_archive(
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 
 bazel_skylib_workspace()
+
+http_archive(
+    name = "com_googlesource_code_re2",
+    sha256 = "665b65b6668156db2b46dddd33405cd422bd611352c5052ab3dae6a5fbac5506",
+    strip_prefix = "re2-2022-12-01",
+    urls = ["https://github.com/google/re2/archive/refs/tags/2022-12-01.tar.gz"],
+)

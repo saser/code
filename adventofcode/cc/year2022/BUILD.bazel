@@ -479,3 +479,75 @@ cc_aoc_benchmark(
         "//adventofcode/data/year2022:day14.real.in": "//adventofcode/data/year2022:day14.real.part2.out",
     },
 )
+
+cc_library(
+    name = "day15_shared",
+    srcs = ["day15_shared.cc"],
+    hdrs = ["day15_shared.h"],
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_googlesource_code_re2//:re2",
+    ],
+)
+
+cc_library(
+    name = "day15",
+    srcs = ["day15.cc"],
+    hdrs = ["day15.h"],
+    deps = [
+        ":day15_shared",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_aoc_test(
+    name = "day15_test",
+    library = ":day15",
+    part1 = {
+        "//adventofcode/data/year2022:day15.real.in": "//adventofcode/data/year2022:day15.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day15.real.in": "//adventofcode/data/year2022:day15.real.part2.out",
+    },
+)
+
+cc_library(
+    name = "day15_example",
+    srcs = ["day15_example.cc"],
+    hdrs = ["day15_example.h"],
+    deps = [
+        ":day15_shared",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_aoc_test(
+    name = "day15_example_test",
+    library = ":day15_example",
+    part1 = {
+        "//adventofcode/data/year2022:day15.example.in": "//adventofcode/data/year2022:day15.example.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day15.example.in": "//adventofcode/data/year2022:day15.example.part2.out",
+    },
+)
+
+cc_aoc_benchmark(
+    name = "day15_benchmark",
+    library = ":day15",
+    part1 = {
+        "//adventofcode/data/year2022:day15.real.in": "//adventofcode/data/year2022:day15.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day15.real.in": "//adventofcode/data/year2022:day15.real.part2.out",
+    },
+)
