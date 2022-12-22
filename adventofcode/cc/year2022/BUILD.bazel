@@ -551,3 +551,43 @@ cc_aoc_benchmark(
         "//adventofcode/data/year2022:day15.real.in": "//adventofcode/data/year2022:day15.real.part2.out",
     },
 )
+
+cc_library(
+    name = "day16",
+    srcs = ["day16.cc"],
+    hdrs = ["day16.h"],
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_googlesource_code_re2//:re2",
+    ],
+)
+
+cc_aoc_test(
+    name = "day16_test",
+    library = ":day16",
+    part1 = {
+        "//adventofcode/data/year2022:day16.example.in": "//adventofcode/data/year2022:day16.example.part1.out",
+        "//adventofcode/data/year2022:day16.real.in": "//adventofcode/data/year2022:day16.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day16.example.in": "//adventofcode/data/year2022:day16.example.part2.out",
+        "//adventofcode/data/year2022:day16.real.in": "//adventofcode/data/year2022:day16.real.part2.out",
+    },
+)
+
+cc_aoc_benchmark(
+    name = "day16_benchmark",
+    library = ":day16",
+    part1 = {
+        "//adventofcode/data/year2022:day16.real.in": "//adventofcode/data/year2022:day16.real.part1.out",
+    },
+    part2 = {
+        "//adventofcode/data/year2022:day16.real.in": "//adventofcode/data/year2022:day16.real.part2.out",
+    },
+)
