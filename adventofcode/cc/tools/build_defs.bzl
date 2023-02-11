@@ -143,7 +143,11 @@ def cc_aoc_test(
 
     part1_pairs = []
     for in_file, out_file in part1.items():
-        part1_pairs.append("$(location %s):$(location %s)" % (in_file, out_file))
+        in_parts = in_file.split(":")[-1].split(".")
+        if len(in_parts) != 3:
+            fail('part1: input file "%s" does not have format "dayXX.<name>.in"' % in_file)
+        pair_name = in_parts[1]
+        part1_pairs.append("%s:$(location %s):$(location %s)" % (pair_name, in_file, out_file))
         if in_file not in srcs:
             srcs.append(in_file)
         if out_file not in srcs:
@@ -153,7 +157,11 @@ def cc_aoc_test(
 
     part2_pairs = []
     for in_file, out_file in part2.items():
-        part2_pairs.append("$(location %s):$(location %s)" % (in_file, out_file))
+        in_parts = in_file.split(":")[-1].split(".")
+        if len(in_parts) != 3:
+            fail('part2: input file "%s" does not have format "dayXX.<name>.in"' % in_file)
+        pair_name = in_parts[1]
+        part2_pairs.append("%s:$(location %s):$(location %s)" % (pair_name, in_file, out_file))
         if in_file not in srcs:
             srcs.append(in_file)
         if out_file not in srcs:

@@ -1,50 +1,29 @@
-#include "{{.HeaderFile}}"
+{{ with $top := . -}}
+#include "{{$top.HeaderFile}}"
 
-#include <utility>
+#include <string>
 
+#include "absl/status/statusor.h"
 #include "adventofcode/cc/trim.h"
 #include "gtest/gtest.h"
 
-class Part1Test
-    : public testing::TestWithParam<std::pair<const char *, const char *>> {};
-
-TEST_P(Part1Test, Solve) {
-  const auto in_out = GetParam();
-  const auto input = in_out.first;
-  const auto want = in_out.second;
-  const auto got = {{.Namespace}}::{{.Part1Func}}(input);
+{{ range $pair := $top.Part1Pairs }}
+TEST(Part1Test, {{$pair.Name}}) {
+  const std::string& input = R"({{$pair.In}})";
+  const std::string& want = R"({{$pair.Out}})";
+  const absl::StatusOr<std::string> got = {{$top.Namespace}}::{{$top.Part1Func}}(input);
   ASSERT_TRUE(got.ok()) << "Solve: " << got.status();
   EXPECT_EQ(*got, adventofcode::cc::trim::TrimSpace(want));
 }
+{{ end }}
 
-INSTANTIATE_TEST_SUITE_P(
-    Instances, Part1Test,
-    testing::Values(
-        {{- range $i, $pair := .Part1Pairs }}
-        {{ if $i }},
-        {{ end -}}
-        std::pair(R"({{.In}})",
-                  R"({{.Out}})")
-        {{ end -}}));
-
-class Part2Test
-    : public testing::TestWithParam<std::pair<const char *, const char *>> {};
-
-TEST_P(Part2Test, Solve) {
-  const auto in_out = GetParam();
-  const auto input = in_out.first;
-  const auto want = in_out.second;
-  const auto got = {{.Namespace}}::{{.Part2Func}}(input);
+{{ range $pair := $top.Part2Pairs }}
+TEST(Part2Test, {{$pair.Name}}) {
+  const std::string& input = R"({{$pair.In}})";
+  const std::string& want = R"({{$pair.Out}})";
+  const absl::StatusOr<std::string> got = {{$top.Namespace}}::{{$top.Part2Func}}(input);
   ASSERT_TRUE(got.ok()) << "Solve: " << got.status();
   EXPECT_EQ(*got, adventofcode::cc::trim::TrimSpace(want));
 }
-
-INSTANTIATE_TEST_SUITE_P(
-    Instances, Part2Test,
-    testing::Values(
-        {{- range $i, $pair := .Part2Pairs }}
-        {{ if $i }},
-        {{ end -}}
-        std::pair(R"({{.In}})",
-                  R"({{.Out}})")
-        {{ end -}}));
+{{ end }}
+{{- end }}
