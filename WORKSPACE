@@ -80,9 +80,9 @@ container_pull(
     repository = "library/hello-world",
 )
 
-BAZEL_TOOLCHAIN_TAG = "0.7.2"
+BAZEL_TOOLCHAIN_TAG = "0.8.2"
 
-BAZEL_TOOLCHAIN_SHA = "f7aa8e59c9d3cafde6edb372d9bd25fb4ee7293ab20b916d867cd0baaa642529"
+BAZEL_TOOLCHAIN_SHA = "0fc3a2b0c9c929920f4bed8f2b446a8274cad41f5ee823fd3faa0d7641f20db0"
 
 http_archive(
     name = "com_grail_bazel_toolchain",
@@ -100,15 +100,7 @@ load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 
 llvm_toolchain(
     name = "llvm_toolchain",
-    # Version 14.0.0 is also available, but I can't seem to get it to work. I
-    # get errors complaining about zlib not being available.
-    # https://stackoverflow.com/questions/72230186/clang-14-warning-cannot-compress-debug-sections-zlib-not-installed-wdebug
-    # makes it seem like version 14.0.0 was built improperly, and the easiest
-    # solution is just to fall back to the previous working version, which was
-    # 13.0.0. Another workaround would be to install Clang on the system and not
-    # configure the toolchain in Bazel, but I'm trading off having a later
-    # version for reproducibility.
-    llvm_version = "13.0.0",
+    llvm_version = "15.0.6",
 )
 
 load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
