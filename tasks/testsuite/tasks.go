@@ -708,63 +708,81 @@ func (s *Suite) TestCreateTask_WithParent() {
 	}
 }
 
-func (s *Suite) TestCreateTask_WithParentInAnotherProject() {
+func (s *Suite) TestCreateTask_WithParentInProject() {
 	t := s.T()
 	ctx := context.Background()
 
-	// We create two projects: one for the parent task, and one that the child
-	// task should attempt to be created within.
-	parentProject := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+	firstProject := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
-			Title: "Parent's project",
+			Title: "This is my first project",
 		},
 	})
-	childProject := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+	secondProject := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
 		Project: &pb.Project{
-			Title: "Child's project",
-		},
-	})
-
-	// Now create the parent task, living in someProject.
-	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
-		Task: &pb.Task{
-			Title:   "Parent task",
-			Project: parentProject.GetName(),
+			Title: "This is my second project",
 		},
 	})
 
 	for _, tt := range []struct {
-		name string
-		req  *pb.CreateTaskRequest
-		want codes.Code
+		name          string
+		parentProject string
+		childProject  string
+		want          codes.Code
 	}{
 		{
-			name: "InAnotherProject",
-			req: &pb.CreateTaskRequest{
-				Task: &pb.Task{
-					Project: childProject.GetName(),
-					Parent:  parent.GetName(),
-					Title:   "Child in another project",
-				},
-			},
-			want: codes.InvalidArgument,
+			name:          "BothEmpty",
+			parentProject: "",
+			childProject:  "",
+			want:          codes.OK,
 		},
 		{
-			name: "WithoutProject",
-			req: &pb.CreateTaskRequest{
-				Task: &pb.Task{
-					Project: "",
-					Parent:  parent.GetName(),
-					Title:   "Child without project",
-				},
-			},
-			want: codes.InvalidArgument,
+			name:          "BothWithProject",
+			parentProject: firstProject.GetName(),
+			childProject:  firstProject.GetName(),
+			want:          codes.OK,
+		},
+		{
+			name:          "ParentHasProject_ChildEmpty",
+			parentProject: firstProject.GetName(),
+			childProject:  "",
+			want:          codes.InvalidArgument,
+		},
+		{
+			name:          "ParentEmpty_ChildHasProject",
+			parentProject: "",
+			childProject:  firstProject.GetName(),
+			want:          codes.InvalidArgument,
+		},
+		{
+			name:          "ParentEmpty_ChildHasProject",
+			parentProject: "",
+			childProject:  firstProject.GetName(),
+			want:          codes.InvalidArgument,
+		},
+		{
+			name:          "DifferentProjects",
+			parentProject: firstProject.GetName(),
+			childProject:  secondProject.GetName(),
+			want:          codes.InvalidArgument,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := s.client.CreateTask(ctx, tt.req)
+			parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:   "parent task",
+					Project: tt.parentProject,
+				},
+			})
+			req := &pb.CreateTaskRequest{
+				Task: &pb.Task{
+					Title:   "child task",
+					Parent:  parent.GetName(),
+					Project: tt.childProject,
+				},
+			}
+			_, err := s.client.CreateTask(ctx, req)
 			if got, want := status.Code(err), tt.want; got != want {
-				t.Errorf("CreateTask(%v) err = %v; want code %v", tt.req, err, want)
+				t.Fatalf("CreateTask(%v) code = %v; want %v", req, got, want)
 			}
 		})
 	}
@@ -1318,9 +1336,17 @@ func (s *Suite) TestUpdateTask_Error() {
 			Description: "That also has a description",
 		},
 	})
+	// We will try updating the parent. To make that realistic and not use fake
+	// data, we create an actual parent that should exist in the system.
 	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
 		Task: &pb.Task{
 			Title: "Potential parent",
+		},
+	})
+	// Ditto for project.
+	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+		Project: &pb.Project{
+			Title: "Potential project",
 		},
 	})
 
@@ -1412,6 +1438,19 @@ func (s *Suite) TestUpdateTask_Error() {
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{
 					Paths: []string{"parent"},
+				},
+			},
+			want: codes.InvalidArgument,
+		},
+		{
+			name: "UpdateProject",
+			req: &pb.UpdateTaskRequest{
+				Task: &pb.Task{
+					Name:    task.GetName(),
+					Project: project.GetName(),
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"project"},
 				},
 			},
 			want: codes.InvalidArgument,

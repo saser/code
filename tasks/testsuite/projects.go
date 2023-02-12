@@ -11,6 +11,7 @@ import (
 	pb "go.saser.se/tasks/tasks_go_proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -1105,6 +1106,61 @@ func (s *Suite) TestDeleteProject() {
 		if got, want := status.Code(err), codes.NotFound; got != want {
 			t.Fatalf("second deletion: DeleteProject(%v) code = %v; want %v", req, got, want)
 		}
+	}
+}
+
+func (s *Suite) TestDeleteProject_WithTasks() {
+	t := s.T()
+	ctx := context.Background()
+
+	project := s.client.CreateProjectT(ctx, t, &pb.CreateProjectRequest{
+		Project: &pb.Project{Title: "This will be deleted"},
+	})
+	parent := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:   "parent task",
+			Project: project.GetName(),
+		},
+	})
+	child := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title:   "child task",
+			Parent:  parent.GetName(),
+			Project: project.GetName(),
+		},
+	})
+	outside := s.client.CreateTaskT(ctx, t, &pb.CreateTaskRequest{
+		Task: &pb.Task{
+			Title: "outside the project",
+		},
+	})
+
+	// Advance the clock so that deletion time is not the same as creation time.
+	s.clock.Advance(12 * time.Hour)
+
+	// Deleting the project should delete all the task trees beneath it.
+	project = s.client.DeleteProjectT(ctx, t, &pb.DeleteProjectRequest{
+		Name: project.GetName(),
+	})
+	parent = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+		Name: parent.GetName(),
+	})
+	if got, want := project.GetDeleteTime(), parent.GetDeleteTime(); !proto.Equal(got, want) {
+		t.Errorf("after deletion: parent.delete_time = %v; want %v (= project.delete_time)", got, want)
+	}
+	child = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+		Name: child.GetName(),
+	})
+	if got, want := project.GetDeleteTime(), child.GetDeleteTime(); !proto.Equal(got, want) {
+		t.Errorf("after deletion: child.delete_time = %v; want %v (= project.delete_time)", got, want)
+	}
+
+	// The task outside the project should have been left untouched.
+	outside = s.client.GetTaskT(ctx, t, &pb.GetTaskRequest{
+		Name: outside.GetName(),
+	})
+	if ts := outside.GetDeleteTime(); ts.IsValid() {
+		t.Errorf("after deletion: outside.delete_time = %v; want it to be unset", ts)
 	}
 }
 

@@ -268,7 +268,32 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if parent := task.GetParent(); parent != "" {
+	// There are some invariants we need to enforce on both the project and the
+	// parent, as well as the combination of them. We therefore extract them to
+	// separate variables here, do the independent validation first, and then
+	// validate the combination of them.
+	project := task.GetProject()
+	hasProject := project != ""
+	parent := task.GetParent()
+	hasParent := parent != ""
+
+	if hasProject {
+		if err := validateProjectName(project); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, `The name of the project must follow the format "projects/{project}", but it was %q`, project)
+		}
+		idx, ok := f.projectIndices[project]
+		if !ok {
+			return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", project)
+		}
+		p := f.projects[idx]
+		if p.GetDeleteTime().IsValid() {
+			return nil, status.Errorf(codes.NotFound, "A project with name %q does not exist.", project)
+		}
+		if p.GetArchiveTime().IsValid() {
+			return nil, status.Errorf(codes.FailedPrecondition, "Project %q is archived; unarchive it before creating a task in it.", project)
+		}
+	}
+	if hasParent {
 		if err := validateTaskName(parent); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, `The name of the parent must follow the format "tasks/{task}", but it was %q.`, parent)
 		}
@@ -276,10 +301,18 @@ func (f *Fake) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.T
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
 		}
-		if p := f.tasks[idx]; p.GetDeleteTime().IsValid() {
+		parentTask := f.tasks[idx]
+		if parentTask.GetDeleteTime().IsValid() {
 			return nil, status.Errorf(codes.NotFound, "A parent task with name %q does not exist.", parent)
 		}
+
+		// Enforced invariant: the child task and the parent task must have the
+		// same project, whether that is empty or not.
+		if childProject, parentProject := project, parentTask.GetProject(); childProject != parentProject {
+			return nil, status.Errorf(codes.InvalidArgument, "The created task's project %q is different from the parent task's project %q; they must be the same.", childProject, parentProject)
+		}
 	}
+
 	for _, label := range task.GetLabels() {
 		if err := validateLabelName(label); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, `The name of the label must follow the format "labels/{label}" but was %q.`, label)
@@ -338,7 +371,7 @@ func (f *Fake) UpdateTask(ctx context.Context, req *pb.UpdateTaskRequest) (*pb.T
 	}
 	for _, path := range updateMask.GetPaths() {
 		switch path {
-		case "parent", "completed", "create_time", "name":
+		case "parent", "completed", "create_time", "name", "project":
 			return nil, status.Errorf(codes.InvalidArgument, "The field %q cannot be updated with UpdateTask.", path)
 		case "*":
 			// We handled the only valid case of giving a wildcard path above,
@@ -832,6 +865,19 @@ func (f *Fake) DeleteProject(ctx context.Context, req *pb.DeleteProjectRequest) 
 	now := f.now()
 	deleted.DeleteTime = timestamppb.New(now)
 	deleted.ExpireTime = timestamppb.New(now.AddDate(0 /*years*/, 0 /*months*/, 30 /*days*/))
+	// If there are any tasks associated with this project, they should also be deleted.
+	for _, task := range f.tasks {
+		if task.GetDeleteTime().IsValid() {
+			// Task is already deleted.
+			continue
+		}
+		if task.GetProject() != name {
+			// Task is not in this project.
+			continue
+		}
+		task.DeleteTime = proto.Clone(deleted.GetDeleteTime()).(*timestamppb.Timestamp)
+		task.ExpireTime = proto.Clone(deleted.GetExpireTime()).(*timestamppb.Timestamp)
+	}
 	return proto.Clone(deleted).(*pb.Project), nil
 }
 
