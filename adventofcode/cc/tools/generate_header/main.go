@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -21,8 +20,8 @@ func init() {
 var (
 	year  = flag.Int("year", 0, "The year. Must be 2015 or later.")
 	day   = flag.Int("day", 0, "The day. Must be in the range 1-25.")
-	part1 = flag.Bool("part1", true, "Whether to generate a function for part 1.")
-	part2 = flag.Bool("part2", true, "Whether to generate a function for part 2.")
+	part1 = flag.Bool("part1", false, "Whether to generate a function for part 1.")
+	part2 = flag.Bool("part2", false, "Whether to generate a function for part 2.")
 
 	output = flag.String("output", "", "Path to write the generated file to. Leaving this empty writes the file to stdout.")
 )
@@ -43,11 +42,8 @@ func errmain() error {
 	if *year < 2015 {
 		return fmt.Errorf("-year=%d must be 2015 or later", *year)
 	}
-	if *day < 1 || *day > 25 {
-		return fmt.Errorf("-day=%d must be in the range 1-25", *day)
-	}
-	if *day == 25 && *part2 {
-		return errors.New("-day=25 and -part2=true, but there's (generally) not a part 2 for day 25")
+	if d := *day; d < 1 || d > 25 {
+		return fmt.Errorf("-day=%d must be in the range 1-25", d)
 	}
 
 	args := templateArgs{

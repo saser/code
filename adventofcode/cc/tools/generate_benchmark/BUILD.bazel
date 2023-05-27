@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 go_library(
     name = "generate_benchmark_lib",
@@ -13,4 +13,11 @@ go_binary(
     name = "generate_benchmark",
     embed = [":generate_benchmark_lib"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "generate_benchmark_test",
+    srcs = ["main_test.go"],
+    data = glob(["testdata/**"]) + [":generate_benchmark"],
+    deps = ["//runfiles"],
 )

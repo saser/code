@@ -7,6 +7,7 @@
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
 
+{{ if (ne .Part1Func "") -}}
 static void BM_Part1(benchmark::State& state, absl::string_view input, absl::string_view want) {
   absl::StatusOr<std::string> got = {{.Namespace}}::{{.Part1Func}}(input);
   if (!got.ok()) {
@@ -23,8 +24,10 @@ static void BM_Part1(benchmark::State& state, absl::string_view input, absl::str
 }
 {{- range .Part1Pairs }}
 BENCHMARK_CAPTURE(BM_Part1, {{.File}}, R"({{.Input}})", adventofcode::cc::trim::TrimSpace(R"({{.Output}})"));
-{{- end}}
+{{- end }}
+{{- end }}
 
+{{ if (ne .Part2Func "") -}}
 static void BM_Part2(benchmark::State& state, absl::string_view input, absl::string_view want) {
   absl::StatusOr<std::string> got = {{.Namespace}}::{{.Part2Func}}(input);
   if (!got.ok()) {
@@ -41,4 +44,5 @@ static void BM_Part2(benchmark::State& state, absl::string_view input, absl::str
 }
 {{- range .Part2Pairs }}
 BENCHMARK_CAPTURE(BM_Part2, {{.File}}, R"({{.Input}})", adventofcode::cc::trim::TrimSpace(R"({{.Output}})"));
-{{- end}}
+{{- end }}
+{{- end }}

@@ -98,7 +98,9 @@ def cc_aoc_test(
             will be derived from `header_file`: if `header_file` is
             "path/to/day01.h", `namespace` will be "path::to::day01".
         part1_func: string. The function within `namespace` solving part 1.
+            Required if `part1` is non-empty.
         part2_func: string. The function within `namespace` solving part 2.
+            Required if `part2` is non-empty.
         part1: map[label]label. Keys are files containing inputs, values are
             files containing corresponding expected outputs. Must not be empty.
         part2: map[label]label. Keys are files containing inputs, values are
@@ -123,12 +125,6 @@ def cc_aoc_test(
         # Transform header_file = "path/to/target.h" into "path::to::target".
         namespace = "::".join(header_file.removesuffix(".h").split("/"))
 
-    if not part1:
-        fail("part1_pairs must not be empty")
-
-    if not part2:
-        fail("part2_pairs must not be empty")
-
     output = name + ".cc"
     srcs = []
     outs = [output]
@@ -136,38 +132,44 @@ def cc_aoc_test(
         "$(location //adventofcode/cc/tools/generate_test)",
         "--header_file='%s'" % header_file,
         "--namespace='%s'" % namespace,
-        "--part1_func='%s'" % part1_func,
-        "--part2_func='%s'" % part2_func,
         "--output='$(location %s)'" % output,
     ]
 
-    part1_pairs = []
-    for in_file, out_file in part1.items():
-        in_parts = in_file.split(":")[-1].split(".")
-        if len(in_parts) != 3:
-            fail('part1: input file "%s" does not have format "dayXX.<name>.in"' % in_file)
-        pair_name = in_parts[1]
-        part1_pairs.append("%s:$(location %s):$(location %s)" % (pair_name, in_file, out_file))
-        if in_file not in srcs:
-            srcs.append(in_file)
-        if out_file not in srcs:
-            srcs.append(out_file)
-    part1_pairs_arg = ",".join(part1_pairs)
-    cmd.append("--part1_pairs='%s'" % part1_pairs_arg)
+    if part1:
+        if not part1_func:
+            fail("part1_func is empty, but it is required because part1 is non-empty")
+        cmd.append("--part1_func='%s'" % part1_func)
+        part1_pairs = []
+        for in_file, out_file in part1.items():
+            in_parts = in_file.split(":")[-1].split(".")
+            if len(in_parts) != 3:
+                fail('part1: input file "%s" does not have format "dayXX.<name>.in"' % in_file)
+            pair_name = in_parts[1]
+            part1_pairs.append("%s:$(location %s):$(location %s)" % (pair_name, in_file, out_file))
+            if in_file not in srcs:
+                srcs.append(in_file)
+            if out_file not in srcs:
+                srcs.append(out_file)
+        part1_pairs_arg = ",".join(part1_pairs)
+        cmd.append("--part1_pairs='%s'" % part1_pairs_arg)
 
-    part2_pairs = []
-    for in_file, out_file in part2.items():
-        in_parts = in_file.split(":")[-1].split(".")
-        if len(in_parts) != 3:
-            fail('part2: input file "%s" does not have format "dayXX.<name>.in"' % in_file)
-        pair_name = in_parts[1]
-        part2_pairs.append("%s:$(location %s):$(location %s)" % (pair_name, in_file, out_file))
-        if in_file not in srcs:
-            srcs.append(in_file)
-        if out_file not in srcs:
-            srcs.append(out_file)
-    part2_pairs_arg = ",".join(part2_pairs)
-    cmd.append("--part2_pairs='%s'" % part2_pairs_arg)
+    if part2:
+        if not part2_func:
+            fail("part2_func is empty, but it is required because part2 is non-empty")
+        cmd.append("--part2_func='%s'" % part2_func)
+        part2_pairs = []
+        for in_file, out_file in part2.items():
+            in_parts = in_file.split(":")[-1].split(".")
+            if len(in_parts) != 3:
+                fail('part2: input file "%s" does not have format "dayXX.<name>.in"' % in_file)
+            pair_name = in_parts[1]
+            part2_pairs.append("%s:$(location %s):$(location %s)" % (pair_name, in_file, out_file))
+            if in_file not in srcs:
+                srcs.append(in_file)
+            if out_file not in srcs:
+                srcs.append(out_file)
+        part2_pairs_arg = ",".join(part2_pairs)
+        cmd.append("--part2_pairs='%s'" % part2_pairs_arg)
 
     native.genrule(
         name = name + "_cc",
@@ -208,7 +210,9 @@ def cc_aoc_benchmark(
             will be derived from `header_file`: if `header_file` is
             "path/to/day01.h", `namespace` will be "path::to::day01".
         part1_func: string. The function within `namespace` solving part 1.
+            Required if `part1` is non-empty.
         part2_func: string. The function within `namespace` solving part 2.
+            Required if `part2` is non-empty.
         part1: map[label]label. Keys are files containing inputs, values are
             files containing corresponding expected outputs. Must not be empty.
         part2: map[label]label. Keys are files containing inputs, values are
@@ -233,12 +237,6 @@ def cc_aoc_benchmark(
         # Transform header_file = "path/to/target.h" into "path::to::target".
         namespace = "::".join(header_file.removesuffix(".h").split("/"))
 
-    if not part1:
-        fail("part1_pairs must not be empty")
-
-    if not part2:
-        fail("part2_pairs must not be empty")
-
     output = name + ".cc"
     srcs = []
     outs = [output]
@@ -246,30 +244,36 @@ def cc_aoc_benchmark(
         "$(location //adventofcode/cc/tools/generate_benchmark)",
         "--header_file='%s'" % header_file,
         "--namespace='%s'" % namespace,
-        "--part1_func='%s'" % part1_func,
-        "--part2_func='%s'" % part2_func,
         "--output='$(location %s)'" % output,
     ]
 
-    part1_pairs = []
-    for in_file, out_file in part1.items():
-        part1_pairs.append("$(location %s):$(location %s)" % (in_file, out_file))
-        if in_file not in srcs:
-            srcs.append(in_file)
-        if out_file not in srcs:
-            srcs.append(out_file)
-    part1_pairs_arg = ",".join(part1_pairs)
-    cmd.append("--part1_pairs='%s'" % part1_pairs_arg)
+    if part1:
+        if not part1_func:
+            fail("part1_func is empty, but it is required because part1 is non-empty")
+        cmd.append("--part1_func='%s'" % part1_func)
+        part1_pairs = []
+        for in_file, out_file in part1.items():
+            part1_pairs.append("$(location %s):$(location %s)" % (in_file, out_file))
+            if in_file not in srcs:
+                srcs.append(in_file)
+            if out_file not in srcs:
+                srcs.append(out_file)
+        part1_pairs_arg = ",".join(part1_pairs)
+        cmd.append("--part1_pairs='%s'" % part1_pairs_arg)
 
-    part2_pairs = []
-    for in_file, out_file in part2.items():
-        part2_pairs.append("$(location %s):$(location %s)" % (in_file, out_file))
-        if in_file not in srcs:
-            srcs.append(in_file)
-        if out_file not in srcs:
-            srcs.append(out_file)
-    part2_pairs_arg = ",".join(part2_pairs)
-    cmd.append("--part2_pairs='%s'" % part2_pairs_arg)
+    if part2:
+        if not part2_func:
+            fail("part2_func is empty, but it is required because part2 is non-empty")
+        cmd.append("--part2_func='%s'" % part2_func)
+        part2_pairs = []
+        for in_file, out_file in part2.items():
+            part2_pairs.append("$(location %s):$(location %s)" % (in_file, out_file))
+            if in_file not in srcs:
+                srcs.append(in_file)
+            if out_file not in srcs:
+                srcs.append(out_file)
+        part2_pairs_arg = ",".join(part2_pairs)
+        cmd.append("--part2_pairs='%s'" % part2_pairs_arg)
 
     native.genrule(
         name = name + "_cc",
