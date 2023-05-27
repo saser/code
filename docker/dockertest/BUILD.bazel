@@ -26,8 +26,9 @@ go_test(
     name = "dockertest_test",
     srcs = ["dockertest_test.go"],
     data = [
-        "hello_world_image.tar",
-        "//docker/dockertest/httpserver:httpserver_image.tar",
+        ":hello_world_image.tar",
+        "@nginx_image//image:image.tar",
     ],
     embed = [":dockertest"],
+    deps = ["@com_github_cenkalti_backoff_v4//:backoff"],
 )

@@ -4,11 +4,13 @@ import (
 	"context"
 	"net/http"
 	"testing"
+
+	"github.com/cenkalti/backoff/v4"
 )
 
 const (
 	helloWorld = "docker/dockertest/hello_world_image.tar"
-	httpServer = "docker/dockertest/httpserver/httpserver_image.tar"
+	nginx      = "external/nginx_image/image/image.tar"
 )
 
 func TestLoad(t *testing.T) {
@@ -37,20 +39,30 @@ func TestAddress(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	opts := RunOptions{
-		Image: Load(ctx, t, httpServer),
+		Image: Load(ctx, t, nginx),
 	}
 	id := Run(ctx, t, opts)
-	addr := Address(ctx, t, id, "8080/tcp")
+	addr := Address(ctx, t, id, "80/tcp")
 
-	// The HTTP server promises to serve something on the "/" path. We only care
-	// that we can make a request to it, and it returns 200 OK. We don't care
-	// about the actual response.
+	// It's not uncommon that Address returns before the container has actually
+	// opened up a listener on the given port. Therefore, if we don't do this
+	// with a retry, this test likely fails.
 	url := "http://" + addr + "/"
-	res, err := http.Get(url)
-	if err != nil {
+	var (
+		res *http.Response
+		err error
+	)
+	op := func() error {
+		res, err = http.Get(url)
+		return err
+	}
+	if err := backoff.Retry(op, backoff.WithContext(backoff.NewExponentialBackOff(), ctx)); err != nil {
 		t.Fatalf("http.Get(%q) err = %v; want nil", url, err)
 	}
 	defer res.Body.Close()
+	// The HTTP server promises to serve something on the "/" path. We only care
+	// that we can make a request to it, and it returns 200 OK. We don't care
+	// about the actual response.
 	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("http.Get(%q) code = %v; want %v", url, got, want)
 	}

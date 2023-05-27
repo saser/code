@@ -14,7 +14,7 @@ $(tools):
 # specified in the WORKSPACE file.
 #
 # The version must be kept in sync with the WORKSPACE file.
-go_version := 1.19.2
+go_version := 1.20.2
 go_archive := $(tools)/go_$(go_version).tar.gz
 $(go_archive): | $(tools)
 	curl \

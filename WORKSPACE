@@ -2,21 +2,25 @@ workspace(name = "code")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+RULES_GO_TAG = "v0.39.1"
+
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "099a9fb96a376ccbbb7d291ed4ecbdfd42f6bc822ab77ae6f1b5cb9e914e94fa",
+    sha256 = "6dc2da7ab4cf5d7bfc7c949776b1b7c733f05e56edc4bcd9022bb249d2e2a996",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.35.0/rules_go-v0.35.0.zip",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.35.0/rules_go-v0.35.0.zip",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/{tag}/rules_go-{tag}.zip".format(tag = RULES_GO_TAG),
+        "https://github.com/bazelbuild/rules_go/releases/download/{tag}/rules_go-{tag}.zip".format(tag = RULES_GO_TAG),
     ],
 )
 
+GAZELLE_TAG = "v0.30.0"
+
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "5982e5463f171da99e3bdaeff8c0f48283a7a5f396ec5282910b9e8a49c0dd7e",
+    sha256 = "727f3e4edd96ea20c29e8c2ca9e8d2af724d8c7778e7923a854b2c80952bc405",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.25.0/bazel-gazelle-v0.25.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.25.0/bazel-gazelle-v0.25.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/{tag}/bazel-gazelle-{tag}.tar.gz".format(tag = GAZELLE_TAG),
+        "https://github.com/bazelbuild/bazel-gazelle/releases/download/{tag}/bazel-gazelle-{tag}.tar.gz".format(tag = GAZELLE_TAG),
     ],
 )
 
@@ -30,7 +34,7 @@ go_repositories()
 go_rules_dependencies()
 
 # This version number must be kept in sync with tools.mk.
-go_register_toolchains(version = "1.19.2")
+go_register_toolchains(version = "1.20.2")
 
 gazelle_dependencies()
 
@@ -63,6 +67,14 @@ load(
 _go_image_repos()
 
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
+
+container_pull(
+    name = "nginx_image",
+    digest = "sha256:6b06964cdbbc517102ce5e0cef95152f3c6a7ef703e4057cb574539de91f72e6",
+    # tag = "1.25",
+    registry = "index.docker.io",
+    repository = "library/nginx",
+)
 
 container_pull(
     name = "postgres_image",
