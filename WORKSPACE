@@ -112,11 +112,13 @@ load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
 
 llvm_register_toolchains()
 
+HEDRON_COMPILE_COMMANDS_COMMIT = "3dddf205a1f5cde20faf2444c1757abe0564ff4c"
+
 http_archive(
     name = "hedron_compile_commands",
-    sha256 = "1e9a72130f8cc7e52dc6e05baa7f1d690c699397dde56ac0fb9c15b98d168f08",
-    strip_prefix = "bazel-compile-commands-extractor-1f154d0e1aaadb92aa25e901004b4c018eebbfc3",
-    url = "https://github.com/hedronvision/bazel-compile-commands-extractor/archive/1f154d0e1aaadb92aa25e901004b4c018eebbfc3.tar.gz",
+    sha256 = "3cd0e49f0f4a6d406c1d74b53b7616f5e24f5fd319eafc1bf8eee6e14124d115",
+    strip_prefix = "bazel-compile-commands-extractor-{commit}".format(commit = HEDRON_COMPILE_COMMANDS_COMMIT),
+    url = "https://github.com/hedronvision/bazel-compile-commands-extractor/archive/{commit}.tar.gz".format(commit = HEDRON_COMPILE_COMMANDS_COMMIT),
 )
 
 load("@hedron_compile_commands//:workspace_setup.bzl", "hedron_compile_commands_setup")
