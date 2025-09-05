@@ -1,4 +1,7 @@
-module(name = "code", version="0.1.0")
+module(
+    name = "code",
+    version = "0.1.0",
+)
 
 # -- bazel_dep definitions -- #
 
@@ -6,15 +9,17 @@ module(name = "code", version="0.1.0")
 # e.g. tests and setting up dev tooling
 
 bazel_dep(name = "gazelle", version = "0.30.0")
+
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
+
 bazel_dep(name = "rules_cc", version = "0.0.4")
 bazel_dep(name = "rules_go", version = "0.39.1")
 bazel_dep(name = "toolchains_llvm", version = "1.5.0")
 
 git_override(
     module_name = "hedron_compile_commands",
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
     commit = "abb61a688167623088f8768cc9264798df6a9d10",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
 )
 
 # NOTE: for the dependencies below, a higher version was used compared to what
@@ -24,7 +29,7 @@ git_override(
 # later version too.
 bazel_dep(name = "abseil-cpp", version = "20250814.0")
 bazel_dep(name = "google_benchmark", version = "1.9.4")
-bazel_dep(name = "googletest", version = "1.17.0") # NOTE: later version compared to WORKSPACE
+bazel_dep(name = "googletest", version = "1.17.0")  # NOTE: later version compared to WORKSPACE
 bazel_dep(name = "re2", version = "2025-08-12")
 
 # NOTE: there was a dependency on bazel_skylib but I dropped it because I
@@ -37,9 +42,8 @@ bazel_dep(name = "re2", version = "2025-08-12")
 
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.toolchain(
-   llvm_version = "15.0.6",
+    llvm_version = "15.0.6",
 )
-
 use_repo(llvm, "llvm_toolchain")
 
 register_toolchains("@llvm_toolchain//:all")
