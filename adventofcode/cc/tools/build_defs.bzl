@@ -288,9 +288,9 @@ def cc_aoc_benchmark(
         deps = [library] + [
             "//adventofcode/cc:trim",
             "@com_github_google_benchmark//:benchmark_main",
-            "@com_google_absl//absl/status:statusor",
-            "@com_google_absl//absl/strings",
-            "@com_google_absl//absl/strings:str_format",
+            "@abseil-cpp//absl/status:statusor",
+            "@abseil-cpp//absl/strings",
+            "@abseil-cpp//absl/strings:str_format",
         ],
         srcs = [output],
     )
