@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/Masterminds/squirrel v1.5.3
 	github.com/bazelbuild/bazelisk v1.14.0
-	github.com/bazelbuild/buildtools v0.0.0-20220531122519-a43aed7014c8
+	github.com/bazelbuild/buildtools v0.0.0-20250826111327-4006b543a694
 	github.com/bazelbuild/rules_go v0.57.0
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/docker/docker v20.10.17+incompatible
