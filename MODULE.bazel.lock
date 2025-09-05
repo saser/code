@@ -231,37 +231,6 @@
         ]
       }
     },
-    "@@gazelle+//internal/bzlmod:non_module_deps.bzl%non_module_deps": {
-      "general": {
-        "bzlTransitiveDigest": "30wev+wJfzc4s72MCfbP9U8W+3Js2b+Xbo5ofgZbHw8=",
-        "usagesDigest": "n9iSPUDFMBuAV//lfZYtddl/7aihTb+8uSPRwE81fOM=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "bazel_gazelle_go_repository_cache": {
-            "repoRuleId": "@@gazelle+//internal:go_repository_cache.bzl%go_repository_cache",
-            "attributes": {
-              "go_sdk_name": "go_default_sdk",
-              "go_env": {}
-            }
-          },
-          "bazel_gazelle_go_repository_tools": {
-            "repoRuleId": "@@gazelle+//internal:go_repository_tools.bzl%go_repository_tools",
-            "attributes": {
-              "go_cache": "@@gazelle++non_module_deps+bazel_gazelle_go_repository_cache//:go.env"
-            }
-          }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "gazelle+",
-            "bazel_gazelle_go_repository_cache",
-            "gazelle++non_module_deps+bazel_gazelle_go_repository_cache"
-          ]
-        ]
-      }
-    },
     "@@hedron_compile_commands+//:workspace_setup.bzl%hedron_compile_commands_extension": {
       "general": {
         "bzlTransitiveDigest": "ETG38zSsY5oO3BJOxG49tKRtht7UfAoeny++EJtBjkw=",
@@ -424,7 +393,7 @@
     },
     "@@rules_kotlin+//src/main/starlark/core/repositories:bzlmod_setup.bzl%rules_kotlin_extensions": {
       "general": {
-        "bzlTransitiveDigest": "hUTp2w+RUVdL7ma5esCXZJAFnX7vLbVfLd7FwnQI6bU=",
+        "bzlTransitiveDigest": "OlvsB0HsvxbR8ZN+J9Vf00X/+WVz/Y/5Xrq2LgcVfdo=",
         "usagesDigest": "QI2z8ZUR+mqtbwsf2fLqYdJAkPOHdOV+tF2yVAUgRzw=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -488,7 +457,7 @@
     },
     "@@rules_python+//python/uv:uv.bzl%uv": {
       "general": {
-        "bzlTransitiveDigest": "bGHlxez0Lkvq2VwrlfCLraKHiJIRHSIJb432X2+pky8=",
+        "bzlTransitiveDigest": "PmZM/pIkZKEDDL68TohlKJrWPYKL5VwUw3MA7kmm6fk=",
         "usagesDigest": "WYhzIw9khRBy34H1GxV5+fI1yi07O90NmCXosPUdHWQ=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
