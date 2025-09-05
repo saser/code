@@ -7,9 +7,9 @@ cc_library(
     srcs = ["runfiles.cc"],
     hdrs = ["runfiles.h"],
     deps = [
-        "@bazel_tools//tools/cpp/runfiles",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
+        "@bazel_tools//tools/cpp/runfiles",
     ],
 )
 

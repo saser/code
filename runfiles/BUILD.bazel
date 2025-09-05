@@ -10,7 +10,7 @@ go_library(
     srcs = ["runfiles.go"],
     importpath = "go.saser.se/runfiles",
     visibility = ["//visibility:public"],
-    deps = ["@rules_go//go/tools/bazel:go_default_library"],
+    deps = ["@rules_go//go/tools/bazel"],
 )
 
 go_test(
