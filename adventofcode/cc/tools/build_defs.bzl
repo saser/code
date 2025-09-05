@@ -73,7 +73,7 @@ def cc_aoc_header(
         srcs = srcs,
         outs = outs,
         cmd = " ".join(cmd),
-        exec_tools = ["//adventofcode/cc/tools/generate_header"],
+        tools = ["//adventofcode/cc/tools/generate_header"],
     )
 
 def cc_aoc_test(
@@ -176,7 +176,7 @@ def cc_aoc_test(
         srcs = srcs,
         outs = outs,
         cmd = " ".join(cmd),
-        exec_tools = ["//adventofcode/cc/tools/generate_test"],
+        tools = ["//adventofcode/cc/tools/generate_test"],
     )
 
     cc_test(
@@ -280,7 +280,7 @@ def cc_aoc_benchmark(
         srcs = srcs,
         outs = outs,
         cmd = " ".join(cmd),
-        exec_tools = ["//adventofcode/cc/tools/generate_benchmark"],
+        tools = ["//adventofcode/cc/tools/generate_benchmark"],
     )
 
     cc_binary(
