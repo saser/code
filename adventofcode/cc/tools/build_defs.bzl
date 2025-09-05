@@ -183,7 +183,7 @@ def cc_aoc_test(
         name = name,
         deps = [library] + [
             "//adventofcode/cc:trim",
-            "@com_google_googletest//:gtest_main",
+            "@googletest//:gtest_main",
         ],
         srcs = [output],
     )
@@ -287,7 +287,7 @@ def cc_aoc_benchmark(
         name = name,
         deps = [library] + [
             "//adventofcode/cc:trim",
-            "@com_github_google_benchmark//:benchmark_main",
+            "@google_benchmark//:benchmark_main",
             "@abseil-cpp//absl/status:statusor",
             "@abseil-cpp//absl/strings",
             "@abseil-cpp//absl/strings:str_format",
