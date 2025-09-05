@@ -1,7 +1,7 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library")
 
 # load("@io_bazel_rules_docker//container:image.bzl", "container_image")
-# load("@io_bazel_rules_go//go:def.bzl", "go_library")
+# load("@rules_go//go:def.bzl", "go_library")
 #
 # container_image(
 #     name = "image",
