@@ -1,6 +1,6 @@
 module go.saser.se
 
-go 1.20
+go 1.25.0
 
 require (
 	github.com/Masterminds/squirrel v1.5.3
