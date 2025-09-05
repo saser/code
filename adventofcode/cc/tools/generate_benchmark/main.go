@@ -7,19 +7,18 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
-
-	"k8s.io/klog/v2"
 
 	// For statically embedding the template.
 	_ "embed"
 )
 
 func init() {
-	klog.InitFlags(flag.CommandLine)
+	// klog.InitFlags(flag.CommandLine)
 }
 
 var (
@@ -120,7 +119,8 @@ func errmain() error {
 		}
 	}
 
-	klog.V(1).Infof("Template args: %+v", args)
+	// klog.V(1).Infof("Template args: %+v", args)
+	log.Printf("Template args: %+v", args)
 
 	var out io.Writer
 	if *output == "" {
@@ -142,6 +142,7 @@ func errmain() error {
 func main() {
 	flag.Parse()
 	if err := errmain(); err != nil {
-		klog.Exit(err)
+		// klog.Exit(err)
+		log.Fatal(err)
 	}
 }
