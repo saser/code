@@ -38,52 +38,52 @@ go_register_toolchains(version = "1.20.2")
 
 gazelle_dependencies()
 
-http_archive(
-    name = "io_bazel_rules_docker",
-    sha256 = "b1e80761a8a8243d03ebca8845e9cc1ba6c82ce7c5179ce2b295cd36f7e394bf",
-    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.25.0/rules_docker-v0.25.0.tar.gz"],
-)
+# http_archive(
+#     name = "io_bazel_rules_docker",
+#     sha256 = "b1e80761a8a8243d03ebca8845e9cc1ba6c82ce7c5179ce2b295cd36f7e394bf",
+#     urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.25.0/rules_docker-v0.25.0.tar.gz"],
+# )
 
-load("@io_bazel_rules_docker//repositories:repositories.bzl", container_repositories = "repositories")
+# load("@io_bazel_rules_docker//repositories:repositories.bzl", container_repositories = "repositories")
 
-container_repositories()
+# container_repositories()
 
-load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
+# load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
 
-container_deps()
+# container_deps()
 
-load(
-    "@io_bazel_rules_docker//go:image.bzl",
-    _go_image_repos = "repositories",
-)
+# load(
+#     "@io_bazel_rules_docker//go:image.bzl",
+#     _go_image_repos = "repositories",
+# )
 
-_go_image_repos()
+# _go_image_repos()
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
+# load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
-container_pull(
-    name = "nginx_image",
-    digest = "sha256:6b06964cdbbc517102ce5e0cef95152f3c6a7ef703e4057cb574539de91f72e6",
-    # tag = "1.25",
-    registry = "index.docker.io",
-    repository = "library/nginx",
-)
+# container_pull(
+#     name = "nginx_image",
+#     digest = "sha256:6b06964cdbbc517102ce5e0cef95152f3c6a7ef703e4057cb574539de91f72e6",
+#     # tag = "1.25",
+#     registry = "index.docker.io",
+#     repository = "library/nginx",
+# )
 
-container_pull(
-    name = "postgres_image",
-    digest = "sha256:3691c00fc177519261bc07b06d0aa990bb17e1bfc31dd79662c9dbd432d2d48b",  # tag "14.1" as of 2022-01-01
-    # tag = "14.1",
-    registry = "index.docker.io",
-    repository = "library/postgres",
-)
+# container_pull(
+#     name = "postgres_image",
+#     digest = "sha256:3691c00fc177519261bc07b06d0aa990bb17e1bfc31dd79662c9dbd432d2d48b",  # tag "14.1" as of 2022-01-01
+#     # tag = "14.1",
+#     registry = "index.docker.io",
+#     repository = "library/postgres",
+# )
 
-container_pull(
-    name = "hello_world_image",
-    # tag = "linux",
-    digest = "sha256:f54a58bc1aac5ea1a25d796ae155dc228b3f0e11d046ae276b39c4bf2f13d8c4",  # tag "linux" as of 2022-01-08
-    registry = "index.docker.io",
-    repository = "library/hello-world",
-)
+# container_pull(
+#     name = "hello_world_image",
+#     # tag = "linux",
+#     digest = "sha256:f54a58bc1aac5ea1a25d796ae155dc228b3f0e11d046ae276b39c4bf2f13d8c4",  # tag "linux" as of 2022-01-08
+#     registry = "index.docker.io",
+#     repository = "library/hello-world",
+# )
 
 BAZEL_TOOLCHAIN_TAG = "0.8.2"
 
