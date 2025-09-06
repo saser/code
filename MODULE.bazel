@@ -77,13 +77,13 @@ go_deps.from_file(go_mod = "//:go.mod")
 # See the README file located next to the patch file for an explanation of what
 # it does.
 go_deps.module_override(
-    path = "github.com/docker/cli",
-    patches = ["//patches/com_github_docker_cli:01-fix-broken-embeds.patch"],
     patch_strip = 1,
+    patches = ["//patches/com_github_docker_cli:01-fix-broken-embeds.patch"],
+    path = "github.com/docker/cli",
 )
 
 # All *direct* Go dependencies of the module have to be listed explicitly.
-use_repo(go_deps, "cc_mvdan_gofumpt", "com_github_bazelbuild_bazelisk", "com_github_bazelbuild_buildtools", "com_github_cenkalti_backoff_v4", "com_github_docker_docker", "com_github_docker_go_connections", "com_github_google_go_cmp", "com_github_google_uuid", "com_github_jackc_pgerrcode", "com_github_jackc_pgx_v5", "com_github_jonboulle_clockwork", "com_github_masterminds_squirrel", "com_github_ory_dockertest_v3", "com_github_stretchr_testify", "io_k8s_klog_v2", "org_golang_google_grpc", "org_golang_google_grpc_cmd_protoc_gen_go_grpc", "org_golang_google_protobuf")
+use_repo(go_deps, "cc_mvdan_gofumpt", "com_github_bazelbuild_bazelisk", "com_github_bazelbuild_buildtools", "com_github_google_go_cmp", "com_github_google_uuid", "com_github_jackc_pgerrcode", "com_github_jackc_pgx_v5", "com_github_jonboulle_clockwork", "com_github_masterminds_squirrel", "com_github_ory_dockertest_v3", "com_github_stretchr_testify", "io_k8s_klog_v2", "org_golang_google_grpc", "org_golang_google_grpc_cmd_protoc_gen_go_grpc", "org_golang_google_protobuf")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
@@ -92,6 +92,13 @@ oci.pull(
     image = "gcr.io/distroless/base",
     platforms = ["linux/amd64"],
 )
+oci.pull(
+    name = "hello_world",
+    digest = "sha256:a0dfb02aac212703bfcb339d77d47ec32c8706ff250850ecc0e19c8737b18567",
+    image = "hello-world",
+    platforms = ["linux/amd64"],
+    tag = "latest",
+)
 
 # For each oci.pull call, repeat the "name" here to expose them as dependencies.
-use_repo(oci, "distroless_base", "distroless_base_linux_amd64")
+use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "hello_world", "hello_world_linux_amd64")

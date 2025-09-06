@@ -808,7 +808,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "cxV4X2zNlwdVp+Fypb29N+SXzWs4M4ZSqFlvUuoT7Mg=",
-        "usagesDigest": "jQ0RCqJranhM/wADdAtNPOg44QG3xNgecRg9iC+ZUkM=",
+        "usagesDigest": "LVp+VpuTQ6ePHuuSQC4yR/IlNKCWdUzpnOJeZnXJl4s=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -839,6 +839,35 @@
                 "@@platforms//cpu:x86_64": "@distroless_base_linux_amd64"
               },
               "bzlmod_repository": "distroless_base",
+              "reproducible": true
+            }
+          },
+          "hello_world_linux_amd64": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/hello-world",
+              "identifier": "sha256:a0dfb02aac212703bfcb339d77d47ec32c8706ff250850ecc0e19c8737b18567",
+              "platform": "linux/amd64",
+              "target_name": "hello_world_linux_amd64",
+              "bazel_tags": []
+            }
+          },
+          "hello_world": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_alias",
+            "attributes": {
+              "target_name": "hello_world",
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/hello-world",
+              "identifier": "sha256:a0dfb02aac212703bfcb339d77d47ec32c8706ff250850ecc0e19c8737b18567",
+              "platforms": {
+                "@@platforms//cpu:x86_64": "@hello_world_linux_amd64"
+              },
+              "bzlmod_repository": "hello_world",
               "reproducible": true
             }
           },
@@ -959,7 +988,9 @@
         "moduleExtensionMetadata": {
           "explicitRootModuleDirectDeps": [
             "distroless_base",
-            "distroless_base_linux_amd64"
+            "distroless_base_linux_amd64",
+            "hello_world",
+            "hello_world_linux_amd64"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
