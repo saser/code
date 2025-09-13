@@ -8,15 +8,14 @@ Requirements:
 *   `make`.
 *   `tar`.
 *   `unzip`.
+*   `bazel` (ideally `bazelisk` installed as `bazel`).
 
-This repository uses [`bazelisk`](https://github.com/bazelbuild/bazelisk) to install and run Bazel. In other words, you don't need to install it yourself. `bazelisk` is invoked via a script called `bazel` in the root of the repository.
-
-To run Bazel for building and testing
+To run Bazel for building and testing:
 
 ```shell
 # Assuming the root of the repository is the working directory.
-$ ./bazel build //...
-$ ./bazel test //...
+$ bazel build //...
+$ bazel test //...
 ```
 
 ## Updating Go dependencies
@@ -28,7 +27,7 @@ $ go get -u -t ./...             # updates direct dependencies
 $ go get -u -t -tags=tools ./... # updates direct tool dependencies, see tools.go in the root of the repository
 $ go mod tidy                    # clean up go.mod and go.sum
 $ make generate                  # regenerate code
-$ make fix                       # update repositories.bzl, BUILD files, etc
+$ make fix                       # update MODULE.bazel, BUILD files, etc
 $ make fix                       # possibly needed due to non-hermetic code formatters
 ```
 

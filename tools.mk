@@ -11,9 +11,9 @@ $(tools):
 # go: the Go toolchain.
 # NOTE: this is only installed to be used to install other tools. The Go
 # toolchain used for actually building stuff is pulled down via Bazel and
-# specified in the WORKSPACE file.
+# specified in the go.mod file.
 #
-# The version must be kept in sync with the WORKSPACE file.
+# The version must be kept in sync with the go.mod file.
 go_version := 1.25.0
 go_archive := $(tools)/go_$(go_version).tar.gz
 $(go_archive): | $(tools)
