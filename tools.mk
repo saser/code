@@ -9,7 +9,7 @@ $(tools):
 	mkdir -p '$@'
 
 # protoc: the protobuf compiler.
-protoc_version := 21.1
+protoc_version := 32.0
 protoc_archive := $(tools)/protoc_$(protoc_version).zip
 $(protoc_archive): | $(tools)
 	curl \
@@ -42,28 +42,3 @@ $(protoc-gen-go-grpc): go.mod $(go) | $(tools)
 		build \
 		-o='$@' \
 		google.golang.org/grpc/cmd/protoc-gen-go-grpc
-
-# clang-format: a code formatter with support for C, C++, and protobuf.
-clang_version := 15.0.2
-clang_archive := $(tools)/clang_$(clang_version).tar.xz
-$(clang_archive): | $(tools)
-	curl \
-		--fail \
-		--location \
-		--show-error \
-		--silent \
-		--output '$@' \
-		'https://github.com/llvm/llvm-project/releases/download/llvmorg-$(clang_version)/clang+llvm-$(clang_version)-x86_64-unknown-linux-gnu-rhel86.tar.xz'
-clang_dir := $(tools)/clang_$(clang_version)
-$(clang_dir): $(clang_archive)
-	mkdir \
-		--parents \
-		'$@'
-	tar \
-		--extract \
-		--directory '$@' \
-		--xz \
-		--strip-components 1 \
-		--file '$(clang_archive)'
-clang-format := $(clang_dir)/bin/clang-format
-$(clang-format): $(clang_dir)

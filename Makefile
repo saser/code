@@ -8,22 +8,22 @@ include tools.mk
 # worth the tradeoff.
 go_module := go.saser.se
 
-build_files := $(shell git ls-files -- 'MODULE.bazel' '**/BUILD.bazel' '*.bzl')
-cc_files := $(shell git ls-files -- '*.cc' '*.h')
-go_files := $(shell git ls-files -- '*.go' | xargs grep -L '^// Code generated .* DO NOT EDIT\.$$')
-proto_files := $(shell git ls-files -- '*.proto')
+build_files := $(shell git ls-files -- 'MODULE.bazel' '**/BUILD.bazel' '*.bzl' | xargs realpath)
+cc_files := $(shell git ls-files -- '*.cc' '*.h' | xargs realpath)
+go_files := $(shell git ls-files -- '*.go' | xargs grep -L '^// Code generated .* DO NOT EDIT\.$$' | xargs realpath)
+proto_files := $(shell git ls-files -- '*.proto' | xargs realpath)
 
 .PHONY: generate
 generate: protoc
 
 .PHONY: protoc
 protoc: \
-	$(proto_files) \
 	$(protoc) \
 	$(protoc-gen-go) \
 	$(protoc-gen-go-grpc)
 protoc:
 	$(protoc) \
+		--proto_path='$(root)' \
 		--plugin='$(protoc-gen-go)' \
 		--go_out=. \
 		--go_opt=module='$(go_module)' \
@@ -42,21 +42,14 @@ fix: \
 	fix-gofumpt
 
 .PHONY: fix-clang-format
-fix-clang-format: \
-	$(clang-format) \
-	$(cc_files) \
-	$(proto_files)
 fix-clang-format:
-	$(clang-format) \
-		--Werror \
+	bazel run @llvm_toolchain//:clang-format -- \
+		-Werror \
 		-i \
 		$(cc_files) \
 		$(proto_files)
 
 .PHONY: fix-buildifier
-fix-buildifier: \
-	$(build_files) \
-	$(buildifier)
 fix-buildifier:
 	bazel run @rules_go//go -- tool buildifier \
 		-lint=fix \
@@ -66,9 +59,6 @@ fix-buildifier:
 		$(build_files)
 
 .PHONY: fix-gofumpt
-fix-gofumpt: \
-	$(go_files) \
-	$(gofumpt)
 fix-gofumpt:
 	bazel run @rules_go//go -- tool gofumpt \
 		-w \

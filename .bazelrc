@@ -1,5 +1,1 @@
 build --cxxopt='-std=c++17'
-
-# Required to use the LLVM/Clang toolchain. See
-# https://github.com/grailbio/bazel-toolchain/tree/2c14d3ffdf9e3403f27f3b3d254734aecdea1c34#quickstart.
-build --incompatible_enable_cc_toolchain_resolution
