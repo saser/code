@@ -105,6 +105,13 @@ oci.pull(
     image = "nginx",
     platforms = ["linux/amd64"],
 )
+oci.pull(
+    name = "postgres",
+    # 'latest' as of 2025-09-13.
+    digest = "sha256:feff5b24fedd610975a1f5e743c51a4b360437f4dc3a11acf740dcd708f413f6",
+    image = "postgres",
+    platforms = ["linux/amd64"],
+)
 
 # For each oci.pull call, repeat the "name" here to expose them as dependencies.
-use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "hello_world", "hello_world_linux_amd64", "nginx", "nginx_linux_amd64")
+use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "hello_world", "hello_world_linux_amd64", "nginx", "nginx_linux_amd64", "postgres", "postgres_linux_amd64")
