@@ -1,6 +1,7 @@
 package dockertest
 
 import (
+	"context"
 	"testing"
 )
 
@@ -17,4 +18,20 @@ func TestPool_Load(t *testing.T) {
 		t.Errorf("Load(%q) = %q; want %q", helloWorld, got, want)
 	}
 }
+
+func TestPool_Run(t *testing.T) {
+	t.Parallel()
+	// Note: t.Context isn't appropriate here because it's cancelled before
+	// the Cleanup functions, registered in Run, are called.
+	ctx := context.Background()
+	p := NewPool(t, "")
+	opts := RunOptions{
+		Image: p.Load(ctx, t, helloWorld),
+	}
+	id := p.Run(ctx, t, opts)
+	// We can't assert much about the ID as it's assigned by the Docker daemon.
+	// It shouldn't be empty, however.
+	if id == "" {
+		t.Errorf("Run(%+v) returned an empty string", opts)
+	}
 }

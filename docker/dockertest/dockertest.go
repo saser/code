@@ -6,8 +6,10 @@ package dockertest
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
@@ -60,6 +62,89 @@ func (p *Pool) Load(ctx context.Context, tb testing.TB, path string) string {
 	}
 	return name
 }
+
+// RunOptions contains the options for [*Pool.Run].
+type RunOptions struct {
+	// The image to run a container with. Required.
+	Image string
+	// Environment variables the container should be started with. Optional.
+	Environment map[string]string
+	// The name of the container to be created. Optional. If not specified, the
+	// Docker daemon will assign a name.
+	Name string
+	// Whether to keep (i.e., not remove) the container after the test ends.
+	// Optional.
+	KeepContainer bool
+	// Whether to keep the container running after the test ends. Optional. If
+	// this is set to true then KeepContainer must also be set to true.
+	KeepRunning bool
+}
+
+// Run starts a container and keeps it alive for the duration of the test. Opts
+// must at least contain the image to run.
+func (p *Pool) Run(ctx context.Context, tb testing.TB, opts RunOptions) string {
+	tb.Helper()
+
+	if opts.Image == "" {
+		tb.Fatalf("dockertest: run: image is required.")
+	}
+
+	if opts.KeepRunning && !opts.KeepContainer {
+		tb.Fatal("dockertest: run: if KeepRunning is true then KeepContainer must also be true.")
+	}
+
+	// First, create the container.
+	contCfg := &docker.Config{
+		Image: opts.Image,
+	}
+	for k, v := range opts.Environment {
+		contCfg.Env = append(contCfg.Env, k+"="+v)
+	}
+	hostCfg := &docker.HostConfig{
+		// As a sane default, always publish all ports. This can be revisited
+		// later if needed.
+		PublishAllPorts: true,
+	}
+	cont, err := p.Client.CreateContainer(docker.CreateContainerOptions{
+		Context:    ctx,
+		Name:       opts.Name,
+		Config:     contCfg,
+		HostConfig: hostCfg,
+	})
+	if err != nil {
+		tb.Fatalf("dockertest: run: create container: %v", err)
+	}
+	// Unless opts.KeepContainer is true, the container should be removed when
+	// the test ends.
+	if !opts.KeepContainer {
+		tb.Cleanup(func() {
+			if err := p.Client.RemoveContainer(docker.RemoveContainerOptions{
+				ID:      cont.ID,
+				Context: ctx,
+			}); err != nil {
+				tb.Errorf("dockertest: run: remove container after test: %v", err)
+			}
+		})
+	}
+
+	// Second, after the container has been created, start the container.
+	if err := p.Client.StartContainerWithContext(cont.ID, nil, ctx); err != nil {
+		tb.Fatalf("dockertest: run: start container: %v", err)
+	}
+	// Unless opts.KeepRunning is true, stop the container when the test ends.
+	if !opts.KeepRunning {
+		tb.Cleanup(func() {
+			err := p.Client.StopContainerWithContext(cont.ID, uint(time.Minute.Seconds()), ctx)
+			if e := new(docker.ContainerNotRunning); errors.As(err, &e) {
+				tb.Logf("NOTE: dockertest: run: attempted to stop container %v (running image %v) but it was not running.", cont.ID, opts.Image)
+				return
+			}
+			if err != nil {
+				tb.Errorf("dockertest: run: stop container after test: %v", err)
+			}
+		})
+	}
+	return cont.ID
 }
 
 // // newClient creates a new Docker SDK client based on environment variables. The
@@ -104,23 +189,6 @@ func (p *Pool) Load(ctx context.Context, tb testing.TB, path string) string {
 // 	}
 // 	defer res.Body.Close()
 // 	return imgs[0]
-// }
-
-// // RunOptions contains the options for Run.
-// type RunOptions struct {
-// 	// The image to run a container with. Required.
-// 	Image string
-// 	// Environment variables the container should be started with. Optional.
-// 	Environment map[string]string
-// 	// The name of the container to be created. Optional. If not specified, the
-// 	// Docker daemon will assign a name.
-// 	Name string
-// 	// Whether to keep (i.e., not remove) the container after the test ends.
-// 	// Optional.
-// 	KeepContainer bool
-// 	// Whether to keep the container running after the test ends. Optional. If
-// 	// this is set to true then KeepContainer must also be set to true.
-// 	KeepRunning bool
 // }
 
 // // Run creates a new container, starts it, and then returns the container ID.
