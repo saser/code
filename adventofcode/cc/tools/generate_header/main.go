@@ -4,16 +4,17 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"text/template"
+
+	"k8s.io/klog/v2"
 
 	// For statically embedding the template.
 	_ "embed"
 )
 
 func init() {
-	// klog.InitFlags(flag.CommandLine)
+	klog.InitFlags(flag.CommandLine)
 }
 
 var (
@@ -71,7 +72,6 @@ func errmain() error {
 func main() {
 	flag.Parse()
 	if err := errmain(); err != nil {
-		// klog.Exit(err)
-		log.Fatal(err)
+		klog.Exit(err)
 	}
 }

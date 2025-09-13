@@ -83,5 +83,5 @@ fix-bazel-mod-tidy:
 	bazel mod tidy
 
 .PHONY: fix-gazelle
-fix-go-buildfiles:
+fix-gazelle:
 	bazel run //:gazelle
