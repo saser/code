@@ -58,7 +58,7 @@ fix-buildifier: \
 	$(build_files) \
 	$(buildifier)
 fix-buildifier:
-	$(buildifier) \
+	bazel run @rules_go//go -- tool buildifier \
 		-lint=fix \
 		-warnings=all \
 		-r \
@@ -70,7 +70,7 @@ fix-gofumpt: \
 	$(go_files) \
 	$(gofumpt)
 fix-gofumpt:
-	$(gofumpt) \
+	bazel run @rules_go//go -- tool gofumpt \
 		-w \
 		$(go_files)
 
