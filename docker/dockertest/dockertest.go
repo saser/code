@@ -5,8 +5,8 @@
 package dockertest
 
 import (
-	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/ory/dockertest/v3"
@@ -27,19 +27,39 @@ func NewPool(tb testing.TB, endpoint string) *Pool {
 	return &Pool{p}
 }
 
-func (p *Pool) Load(ctx context.Context, tb testing.TB, path string) {
+// Load takes a path to a tarball containing a Docker image and loads it into
+// the Docker daemon, returning the image name. See the tests for an example of
+// how to use this.
+func (p *Pool) Load(ctx context.Context, tb testing.TB, path string) string {
 	tb.Helper()
 
 	f := runfiles.OpenT(tb, path)
-	out := new(bytes.Buffer)
+	var out strings.Builder
 	err := p.Client.LoadImage(docker.LoadImageOptions{
 		Context:      ctx,
 		InputStream:  f,
-		OutputStream: out,
+		OutputStream: &out,
 	})
 	if err != nil {
 		tb.Fatalf("dockertest: failed to load image with path %q: %v.\nOutput: %q", path, err, out.String())
 	}
+
+	// This is a bit hacky and relies on specific output probably intended
+	// for humans ... but it works well enough for now.
+	// The Docker daemon responds with a message like:
+	//
+	//     Loaded image: example.com/my/image:tag
+	//
+	// (with a trailing newline) and we want to extract
+	// "example.com/my/image:tag". To do that, we simply look for a string
+	// following the exact format like the above, and return the image name.
+	output := strings.TrimSpace(out.String())
+	name, ok := strings.CutPrefix(output, "Loaded image: ")
+	if !ok {
+		tb.Fatalf("dockertest: load: could not extract image name from output from Docker daemon. Full output:\n%s", output)
+	}
+	return name
+}
 }
 
 // // newClient creates a new Docker SDK client based on environment variables. The

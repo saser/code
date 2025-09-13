@@ -1,11 +1,20 @@
 package dockertest
 
-import "testing"
+import (
+	"testing"
+)
+
+const helloWorld = "docker/dockertest/hello_world/tarball.tar"
 
 func TestPool_Load(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
 	p := NewPool(t, "")
-	p.Load(ctx, t, "docker/dockertest/hello_world/tarball.tar")
+	got := p.Load(ctx, t, helloWorld)
+	want := "saser.se/docker/dockertest/hello_world:latest"
+	if got != want {
+		t.Errorf("Load(%q) = %q; want %q", helloWorld, got, want)
+	}
+}
 }
