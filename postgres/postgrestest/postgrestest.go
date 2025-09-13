@@ -33,16 +33,16 @@ func Open(ctx context.Context, tb testing.TB, schemaPath string) *postgres.Pool 
 	dbName = strings.ReplaceAll(dbName, "/", "_")
 
 	// Start a Postgres container and get the address it's listening on.
-	opts := dockertest.RunOptions{
-		Image: dockertest.Load(ctx, tb, "postgres/image.tar"),
+	p := dockertest.NewPool(tb, "")
+	id := p.Run(ctx, tb, dockertest.RunOptions{
+		Image: p.Load(ctx, tb, runfiles.PathT(tb, "postgres/image/tarball.tar")),
 		Environment: map[string]string{
 			"POSTGRES_USER":     user,
 			"POSTGRES_PASSWORD": password,
 			"POSTGRES_DB":       dbName,
 		},
-	}
-	id := dockertest.Run(ctx, tb, opts)
-	addr := dockertest.Address(ctx, tb, id, "5432/tcp")
+	})
+	addr := p.Address(ctx, tb, id, "5432/tcp")
 
 	// Connect to the container.
 	connString := (&url.URL{

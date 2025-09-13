@@ -7,9 +7,9 @@ cc_library(
     srcs = ["runfiles.cc"],
     hdrs = ["runfiles.h"],
     deps = [
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
         "@bazel_tools//tools/cpp/runfiles",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -19,7 +19,7 @@ cc_test(
     data = ["//runfiles:test.txt"],
     deps = [
         ":runfiles",
-        "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
+        "@abseil-cpp//absl/status",
+        "@googletest//:gtest_main",
     ],
 )

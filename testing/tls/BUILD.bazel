@@ -12,6 +12,6 @@ genrule(
         '--cert_out="$(location test_cert.pem)"',
         '--key_out="$(location test_key.pem)"',
     ]),
-    exec_tools = ["//testing/tls/generate_certificate"],
+    tools = ["//testing/tls/generate_certificate"],
     visibility = ["//visibility:public"],
 )

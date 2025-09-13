@@ -1,33 +1,38 @@
 package dockertest
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
 	"github.com/cenkalti/backoff/v4"
+	"go.saser.se/runfiles"
 )
 
-const (
-	helloWorld = "docker/dockertest/hello_world_image.tar"
-	nginx      = "external/nginx_image/image/image.tar"
+var (
+	helloWorld = runfiles.MustPath("docker/dockertest/hello_world/tarball.tar")
+	nginx      = runfiles.MustPath("docker/dockertest/nginx/tarball.tar")
 )
 
-func TestLoad(t *testing.T) {
+func TestPool_Load(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	if got, want := Load(ctx, t, helloWorld), "bazel/docker/dockertest:hello_world_image"; got != want {
+	ctx := t.Context()
+
+	p := NewPool(t, "")
+	got := p.Load(ctx, t, helloWorld)
+	want := "saser.se/docker/dockertest/hello_world:latest"
+	if got != want {
 		t.Errorf("Load(%q) = %q; want %q", helloWorld, got, want)
 	}
 }
 
-func TestRun(t *testing.T) {
+func TestPool_Run(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
+	p := NewPool(t, "")
 	opts := RunOptions{
-		Image: Load(ctx, t, helloWorld),
+		Image: p.Load(ctx, t, helloWorld),
 	}
-	id := Run(ctx, t, opts)
+	id := p.Run(ctx, t, opts)
 	// We can't assert much about the ID as it's assigned by the Docker daemon.
 	// It shouldn't be empty, however.
 	if id == "" {
@@ -35,14 +40,15 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func TestAddress(t *testing.T) {
+func TestPool_Address(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
+	p := NewPool(t, "")
 	opts := RunOptions{
-		Image: Load(ctx, t, nginx),
+		Image: p.Load(ctx, t, nginx),
 	}
-	id := Run(ctx, t, opts)
-	addr := Address(ctx, t, id, "80/tcp")
+	id := p.Run(ctx, t, opts)
+	addr := p.Address(ctx, t, id, "80/tcp")
 
 	// It's not uncommon that Address returns before the container has actually
 	// opened up a listener on the given port. Therefore, if we don't do this

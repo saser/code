@@ -11,10 +11,10 @@ $(tools):
 # go: the Go toolchain.
 # NOTE: this is only installed to be used to install other tools. The Go
 # toolchain used for actually building stuff is pulled down via Bazel and
-# specified in the WORKSPACE file.
+# specified in the go.mod file.
 #
-# The version must be kept in sync with the WORKSPACE file.
-go_version := 1.20.2
+# The version must be kept in sync with the go.mod file.
+go_version := 1.25.0
 go_archive := $(tools)/go_$(go_version).tar.gz
 $(go_archive): | $(tools)
 	curl \
@@ -37,14 +37,6 @@ $(go_dir): $(go_archive)
 		--file '$(go_archive)'
 go := $(go_dir)/bin/go
 $(go): $(go_dir)
-
-# bazelisk: a script to run Bazel with a given version.
-bazelisk := $(tools)/bazelisk
-$(bazelisk): go.mod $(go) | $(tools)
-	$(go) \
-		build \
-		-o='$@' \
-		github.com/bazelbuild/bazelisk
 
 # buildifier: a formatter and linter for BUILD.bazel files.
 buildifier := $(tools)/buildifier

@@ -8,9 +8,9 @@ include tools.mk
 # worth the tradeoff.
 go_module := go.saser.se
 
-build_files := $(shell git ls-files -- 'WORKSPACE' '**/BUILD.bazel' '*.bzl')
+build_files := $(shell git ls-files -- 'MODULE.bazel' '**/BUILD.bazel' '*.bzl')
 cc_files := $(shell git ls-files -- '*.cc' '*.h')
-go_files := $(shell git ls-files -- '*.go')
+go_files := $(shell git ls-files -- '*.go' | xargs grep -L '^// Code generated .* DO NOT EDIT\.$$')
 proto_files := $(shell git ls-files -- '*.proto')
 
 .PHONY: generate
@@ -34,9 +34,11 @@ protoc:
 
 .PHONY: fix
 fix: \
+	fix-bazel-mod-tidy \
 	fix-buildifier \
 	fix-clang-format \
-	fix-go-buildfiles \
+	fix-gazelle \
+	fix-go-mod-tidy \
 	fix-gofumpt
 
 .PHONY: fix-clang-format
@@ -72,8 +74,14 @@ fix-gofumpt:
 		-w \
 		$(go_files)
 
-.PHONY: fix-go-buildfiles
-fix-go-buildfiles: $(go)
-	$(go) mod tidy -v
-	./bazel run //:gazelle_update_repos
-	./bazel run //:gazelle
+.PHONY: fix-go-mod-tidy
+fix-go-mod-tidy:
+	bazel run @rules_go//go -- mod tidy -v
+
+.PHONY: fix-bazel-mod-tidy
+fix-bazel-mod-tidy:
+	bazel mod tidy
+
+.PHONY: fix-gazelle
+fix-gazelle:
+	bazel run //:gazelle

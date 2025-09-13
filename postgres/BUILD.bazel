@@ -1,10 +1,17 @@
-load("@io_bazel_rules_docker//container:image.bzl", "container_image")
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library")
+load("@rules_oci//oci:defs.bzl", "oci_load")
 
-container_image(
+oci_load(
     name = "image",
-    base = "@postgres_image//image",
-    visibility = ["//visibility:public"],
+    image = "@postgres",
+    repo_tags = ["saser.se/postgres/postgres:latest"],
+)
+
+filegroup(
+    name = "image.tar",
+    srcs = [":image"],
+    output_group = "tarball",
+    visibility = ["//postgres:__subpackages__"],
 )
 
 go_library(

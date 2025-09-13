@@ -1,0 +1,114 @@
+module(
+    name = "code",
+    version = "0.1.0",
+)
+
+# -- bazel_dep definitions -- #
+
+bazel_dep(name = "gazelle", version = "0.45.0")
+bazel_dep(name = "rules_cc", version = "0.2.3")
+bazel_dep(name = "rules_go", version = "0.57.0")
+bazel_dep(name = "toolchains_llvm", version = "1.5.0")
+bazel_dep(name = "rules_oci", version = "2.2.6")
+
+# NOTE from the Bzlmod migration:
+# For the dependencies below, a higher version was used compared to what was in
+# WORKSPACE. The reason is that the WORKSPACE versions were often arbitrary
+# commit hashes and I couldn't be arsed to do overrides, and figured that these
+# dependencies had stable enough APIs that I can probably live with a later
+# version too.
+bazel_dep(name = "abseil-cpp", version = "20250814.0")
+bazel_dep(name = "google_benchmark", version = "1.9.4")
+bazel_dep(name = "googletest", version = "1.17.0")
+bazel_dep(name = "re2", version = "2025-08-12")
+
+bazel_dep(name = "hedron_compile_commands")
+git_override(
+    module_name = "hedron_compile_commands",
+    commit = "abb61a688167623088f8768cc9264798df6a9d10",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
+)
+
+# For some completely incomprehensible reason, there appears to be a dependency version problem in the combination of
+# - the `github.com/docker/docker` Go module
+# - the `re2` Bazel module
+# - the `rules_cc` Bazel module
+# - the `abseil-cpp` Bazel module
+# that causes build errors for me. They look like this:
+#
+#     $ bazel build //...
+#     ERROR: /home/saser/.cache/bazel/_bazel_saser/06ad534583e887506ca6aa175f8ed7b5/external/abseil-cpp+/absl/utility/BUILD.bazel: no such target '@@abseil-cpp+//absl/utility:if_constexpr': target 'if_constexpr' not declared in package 'absl/utility' defined by /home/saser/.cache/bazel/_bazel_saser/06ad534583e887506ca6aa175f8ed7b5/external/abseil-cpp+/absl/utility/BUILD.bazel
+#     ERROR: /home/saser/.cache/bazel/_bazel_saser/06ad534583e887506ca6aa175f8ed7b5/external/protobuf+/src/google/protobuf/BUILD.bazel:483:11: no such target '@@abseil-cpp+//absl/utility:if_constexpr': target 'if_constexpr' not declared in package 'absl/utility' defined by /home/saser/.cache/bazel/_bazel_saser/06ad534583e887506ca6aa175f8ed7b5/external/abseil-cpp+/absl/utility/BUILD.bazel and referenced by '@@protobuf+//src/google/protobuf:protobuf_lite'
+#     ERROR: Analysis of target '//docker/dockertest:dockertest' failed; build aborted: Analysis failed
+#     INFO: Elapsed time: 0.734s, Critical Path: 0.00s
+#     INFO: 1 process: 1 internal.
+#     ERROR: Build did NOT complete successfully
+#
+# And somehow, bumping the version of Protobuf (it resolves to 29.0 otherwise)
+# fixes this problem. I don't know why, but I'm keeping it here until further
+# notice. I might start relying on it anyway to run `protoc`, who knows.
+bazel_dep(name = "protobuf", version = "32.0")
+
+# NOTE: there was a dependency on bazel_skylib but I dropped it because I
+# couldn't find any references to it in this repo... can't remember why I added
+# it either, maybe to fix some transitive dependency?
+
+# -- use_repo_rule statements -- #
+
+# -- repo definitions -- #
+
+llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
+llvm.toolchain(
+    llvm_version = "15.0.6",
+)
+use_repo(llvm, "llvm_toolchain")
+
+register_toolchains("@llvm_toolchain//:all")
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.from_file(go_mod = "//:go.mod")
+
+go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+go_deps.from_file(go_mod = "//:go.mod")
+
+# See the README file located next to the patch file for an explanation of what
+# it does.
+go_deps.module_override(
+    patch_strip = 1,
+    patches = ["//patches/com_github_docker_cli:01-fix-broken-embeds.patch"],
+    path = "github.com/docker/cli",
+)
+
+# All *direct* Go dependencies of the module have to be listed explicitly.
+use_repo(go_deps, "cc_mvdan_gofumpt", "com_github_bazelbuild_buildtools", "com_github_cenkalti_backoff_v4", "com_github_google_go_cmp", "com_github_google_uuid", "com_github_jackc_pgerrcode", "com_github_jackc_pgx_v5", "com_github_jonboulle_clockwork", "com_github_masterminds_squirrel", "com_github_ory_dockertest_v3", "com_github_stretchr_testify", "io_k8s_klog_v2", "org_golang_google_grpc", "org_golang_google_grpc_cmd_protoc_gen_go_grpc", "org_golang_google_protobuf")
+
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+oci.pull(
+    name = "distroless_base",
+    digest = "sha256:d605e138bb398428779e5ab490a6bbeeabfd2551bd919578b1044718e5c30798",
+    image = "gcr.io/distroless/base",
+    platforms = ["linux/amd64"],
+)
+oci.pull(
+    name = "hello_world",
+    digest = "sha256:a0dfb02aac212703bfcb339d77d47ec32c8706ff250850ecc0e19c8737b18567",
+    image = "hello-world",
+    platforms = ["linux/amd64"],
+)
+oci.pull(
+    name = "nginx",
+    # 'latest' as of 2025-09-13.
+    digest = "sha256:d5f28ef21aabddd098f3dbc21fe5b7a7d7a184720bc07da0b6c9b9820e97f25e",
+    image = "nginx",
+    platforms = ["linux/amd64"],
+)
+oci.pull(
+    name = "postgres",
+    # 'latest' as of 2025-09-13.
+    digest = "sha256:feff5b24fedd610975a1f5e743c51a4b360437f4dc3a11acf740dcd708f413f6",
+    image = "postgres",
+    platforms = ["linux/amd64"],
+)
+
+# For each oci.pull call, repeat the "name" here to expose them as dependencies.
+use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "hello_world", "hello_world_linux_amd64", "nginx", "nginx_linux_amd64", "postgres", "postgres_linux_amd64")

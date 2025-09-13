@@ -1,9 +1,28 @@
-load("@io_bazel_rules_docker//container:image.bzl", "container_image")
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_oci//oci:defs.bzl", "oci_load")
 
-container_image(
-    name = "hello_world_image",
-    base = "@hello_world_image//image",
+oci_load(
+    name = "hello_world",
+    image = "@hello_world",
+    repo_tags = ["saser.se/docker/dockertest/hello_world:latest"],
+)
+
+filegroup(
+    name = "hello_world.tar",
+    srcs = [":hello_world"],
+    output_group = "tarball",
+)
+
+oci_load(
+    name = "nginx",
+    image = "@nginx",
+    repo_tags = ["saser.se/docker/dockertest/nginx:latest"],
+)
+
+filegroup(
+    name = "nginx.tar",
+    srcs = [":nginx"],
+    output_group = "tarball",
 )
 
 go_library(
@@ -12,13 +31,10 @@ go_library(
     importpath = "go.saser.se/docker/dockertest",
     visibility = ["//visibility:public"],
     deps = [
-        "//docker/imagetar",
         "//runfiles",
         "@com_github_cenkalti_backoff_v4//:backoff",
-        "@com_github_docker_docker//api/types",
-        "@com_github_docker_docker//api/types/container",
-        "@com_github_docker_docker//client",
-        "@com_github_docker_go_connections//nat",
+        "@com_github_ory_dockertest_v3//:dockertest",
+        "@com_github_ory_dockertest_v3//docker",
     ],
 )
 
@@ -26,9 +42,12 @@ go_test(
     name = "dockertest_test",
     srcs = ["dockertest_test.go"],
     data = [
-        ":hello_world_image.tar",
-        "@nginx_image//image:image.tar",
+        ":hello_world.tar",
+        ":nginx.tar",
     ],
     embed = [":dockertest"],
-    deps = ["@com_github_cenkalti_backoff_v4//:backoff"],
+    deps = [
+        "//runfiles",
+        "@com_github_cenkalti_backoff_v4//:backoff",
+    ],
 )

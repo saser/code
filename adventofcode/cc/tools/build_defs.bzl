@@ -73,7 +73,7 @@ def cc_aoc_header(
         srcs = srcs,
         outs = outs,
         cmd = " ".join(cmd),
-        exec_tools = ["//adventofcode/cc/tools/generate_header"],
+        tools = ["//adventofcode/cc/tools/generate_header"],
     )
 
 def cc_aoc_test(
@@ -176,14 +176,14 @@ def cc_aoc_test(
         srcs = srcs,
         outs = outs,
         cmd = " ".join(cmd),
-        exec_tools = ["//adventofcode/cc/tools/generate_test"],
+        tools = ["//adventofcode/cc/tools/generate_test"],
     )
 
     cc_test(
         name = name,
         deps = [library] + [
             "//adventofcode/cc:trim",
-            "@com_google_googletest//:gtest_main",
+            "@googletest//:gtest_main",
         ],
         srcs = [output],
     )
@@ -280,17 +280,17 @@ def cc_aoc_benchmark(
         srcs = srcs,
         outs = outs,
         cmd = " ".join(cmd),
-        exec_tools = ["//adventofcode/cc/tools/generate_benchmark"],
+        tools = ["//adventofcode/cc/tools/generate_benchmark"],
     )
 
     cc_binary(
         name = name,
         deps = [library] + [
             "//adventofcode/cc:trim",
-            "@com_github_google_benchmark//:benchmark_main",
-            "@com_google_absl//absl/status:statusor",
-            "@com_google_absl//absl/strings",
-            "@com_google_absl//absl/strings:str_format",
+            "@google_benchmark//:benchmark_main",
+            "@abseil-cpp//absl/status:statusor",
+            "@abseil-cpp//absl/strings",
+            "@abseil-cpp//absl/strings:str_format",
         ],
         srcs = [output],
     )

@@ -6,7 +6,7 @@ cc_library(
     name = "trim",
     srcs = ["trim.cc"],
     hdrs = ["trim.h"],
-    deps = ["@com_google_absl//absl/strings"],
+    deps = ["@abseil-cpp//absl/strings"],
 )
 
 cc_test(
@@ -14,6 +14,6 @@ cc_test(
     srcs = ["trim_test.cc"],
     deps = [
         ":trim",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )

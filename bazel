@@ -1,4 +1,0 @@
-#!/bin/bash
-
-make "$(pwd)/_tools/bazelisk"
-exec "$(pwd)/_tools/bazelisk" "$@"

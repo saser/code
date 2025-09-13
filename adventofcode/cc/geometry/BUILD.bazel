@@ -6,7 +6,7 @@ cc_library(
     name = "pos",
     srcs = ["pos.cc"],
     hdrs = ["pos.h"],
-    deps = ["@com_google_absl//absl/strings:str_format"],
+    deps = ["@abseil-cpp//absl/strings:str_format"],
 )
 
 cc_test(
@@ -14,8 +14,8 @@ cc_test(
     srcs = ["pos_test.cc"],
     deps = [
         ":pos",
-        "@com_google_absl//absl/hash:hash_testing",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_googletest//:gtest_main",
+        "@abseil-cpp//absl/hash:hash_testing",
+        "@abseil-cpp//absl/strings:str_format",
+        "@googletest//:gtest_main",
     ],
 )
