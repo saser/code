@@ -46,5 +46,8 @@ go_test(
         ":nginx.tar",
     ],
     embed = [":dockertest"],
-    deps = ["@com_github_cenkalti_backoff_v4//:backoff"],
+    deps = [
+        "//runfiles",
+        "@com_github_cenkalti_backoff_v4//:backoff",
+    ],
 )

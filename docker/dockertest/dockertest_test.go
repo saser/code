@@ -5,22 +5,26 @@ import (
 	"testing"
 
 	"github.com/cenkalti/backoff/v4"
+	"go.saser.se/runfiles"
 )
 
-const (
-	helloWorld = "docker/dockertest/hello_world/tarball.tar"
-	nginx      = "docker/dockertest/nginx/tarball.tar"
-)
+func helloWorld(t *testing.T) string {
+	return runfiles.PathT(t, "docker/dockertest/hello_world/tarball.tar")
+}
+
+func nginx(t *testing.T) string {
+	return runfiles.PathT(t, "docker/dockertest/nginx/tarball.tar")
+}
 
 func TestPool_Load(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
 	p := NewPool(t, "")
-	got := p.Load(ctx, t, helloWorld)
+	got := p.Load(ctx, t, helloWorld(t))
 	want := "saser.se/docker/dockertest/hello_world:latest"
 	if got != want {
-		t.Errorf("Load(%q) = %q; want %q", helloWorld, got, want)
+		t.Errorf("Load(%q) = %q; want %q", helloWorld(t), got, want)
 	}
 }
 
@@ -29,7 +33,7 @@ func TestPool_Run(t *testing.T) {
 	ctx := t.Context()
 	p := NewPool(t, "")
 	opts := RunOptions{
-		Image: p.Load(ctx, t, helloWorld),
+		Image: p.Load(ctx, t, helloWorld(t)),
 	}
 	id := p.Run(ctx, t, opts)
 	// We can't assert much about the ID as it's assigned by the Docker daemon.
@@ -44,7 +48,7 @@ func TestPool_Address(t *testing.T) {
 	ctx := t.Context()
 	p := NewPool(t, "")
 	opts := RunOptions{
-		Image: p.Load(ctx, t, nginx),
+		Image: p.Load(ctx, t, nginx(t)),
 	}
 	id := p.Run(ctx, t, opts)
 	addr := p.Address(ctx, t, id, "80/tcp")
