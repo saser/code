@@ -18,10 +18,15 @@ import (
 	"go.saser.se/runfiles"
 )
 
+// Pool wraps a [*dockertest.Pool] and provides some convenient test helpers on
+// top of it.
 type Pool struct {
 	*dockertest.Pool
 }
 
+// NewPool initializes a new Docker client connection pool. Pass an empty string
+// as the endpoint to get reasonable defaults; see the documentation for
+// [dockertest.NewPool] for more details.
 func NewPool(tb testing.TB, endpoint string) *Pool {
 	tb.Helper()
 	p, err := dockertest.NewPool(endpoint)
