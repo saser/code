@@ -1,7 +1,6 @@
 package dockertest
 
 import (
-	"context"
 	"testing"
 )
 
@@ -21,9 +20,7 @@ func TestPool_Load(t *testing.T) {
 
 func TestPool_Run(t *testing.T) {
 	t.Parallel()
-	// Note: t.Context isn't appropriate here because it's cancelled before
-	// the Cleanup functions, registered in Run, are called.
-	ctx := context.Background()
+	ctx := t.Context()
 	p := NewPool(t, "")
 	opts := RunOptions{
 		Image: p.Load(ctx, t, helloWorld),

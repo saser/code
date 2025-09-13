@@ -85,6 +85,13 @@ type RunOptions struct {
 func (p *Pool) Run(ctx context.Context, tb testing.TB, opts RunOptions) string {
 	tb.Helper()
 
+	// cleanupCtx is used for the common cleanup tasks (stopping/removing
+	// containers) but has been separated from the cancel signal carried in
+	// ctx (if any). This is intended to support the common use case of
+	// using [testing.T.Context] as the top-level context in tests, which is
+	// documented to be cancelled just before Cleanup functions are called.
+	cleanupCtx := context.WithoutCancel(ctx)
+
 	if opts.Image == "" {
 		tb.Fatalf("dockertest: run: image is required.")
 	}
@@ -120,7 +127,7 @@ func (p *Pool) Run(ctx context.Context, tb testing.TB, opts RunOptions) string {
 		tb.Cleanup(func() {
 			if err := p.Client.RemoveContainer(docker.RemoveContainerOptions{
 				ID:      cont.ID,
-				Context: ctx,
+				Context: cleanupCtx,
 			}); err != nil {
 				tb.Errorf("dockertest: run: remove container after test: %v", err)
 			}
@@ -134,7 +141,7 @@ func (p *Pool) Run(ctx context.Context, tb testing.TB, opts RunOptions) string {
 	// Unless opts.KeepRunning is true, stop the container when the test ends.
 	if !opts.KeepRunning {
 		tb.Cleanup(func() {
-			err := p.Client.StopContainerWithContext(cont.ID, uint(time.Minute.Seconds()), ctx)
+			err := p.Client.StopContainerWithContext(cont.ID, uint(time.Minute.Seconds()), cleanupCtx)
 			if e := new(docker.ContainerNotRunning); errors.As(err, &e) {
 				tb.Logf("NOTE: dockertest: run: attempted to stop container %v (running image %v) but it was not running.", cont.ID, opts.Image)
 				return
