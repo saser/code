@@ -10,7 +10,7 @@ go_module := go.saser.se
 
 build_files := $(shell git ls-files -- 'MODULE.bazel' '**/BUILD.bazel' '*.bzl')
 cc_files := $(shell git ls-files -- '*.cc' '*.h')
-go_files := $(shell git ls-files -- '*.go')
+go_files := $(shell git ls-files -- '*.go' | xargs grep -L '^// Code generated .* DO NOT EDIT\.$$')
 proto_files := $(shell git ls-files -- '*.proto')
 
 .PHONY: generate
