@@ -808,7 +808,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "cxV4X2zNlwdVp+Fypb29N+SXzWs4M4ZSqFlvUuoT7Mg=",
-        "usagesDigest": "LVp+VpuTQ6ePHuuSQC4yR/IlNKCWdUzpnOJeZnXJl4s=",
+        "usagesDigest": "fP6ts35M+e2Y93gQfYLemCL7Zv+zOjC3ME5Xwq1VC1A=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -868,6 +868,35 @@
                 "@@platforms//cpu:x86_64": "@hello_world_linux_amd64"
               },
               "bzlmod_repository": "hello_world",
+              "reproducible": true
+            }
+          },
+          "nginx_linux_amd64": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/nginx",
+              "identifier": "sha256:d5f28ef21aabddd098f3dbc21fe5b7a7d7a184720bc07da0b6c9b9820e97f25e",
+              "platform": "linux/amd64",
+              "target_name": "nginx_linux_amd64",
+              "bazel_tags": []
+            }
+          },
+          "nginx": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_alias",
+            "attributes": {
+              "target_name": "nginx",
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/nginx",
+              "identifier": "sha256:d5f28ef21aabddd098f3dbc21fe5b7a7d7a184720bc07da0b6c9b9820e97f25e",
+              "platforms": {
+                "@@platforms//cpu:x86_64": "@nginx_linux_amd64"
+              },
+              "bzlmod_repository": "nginx",
               "reproducible": true
             }
           },
@@ -990,7 +1019,9 @@
             "distroless_base",
             "distroless_base_linux_amd64",
             "hello_world",
-            "hello_world_linux_amd64"
+            "hello_world_linux_amd64",
+            "nginx",
+            "nginx_linux_amd64"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",

@@ -7,6 +7,7 @@ require (
 	github.com/bazelbuild/bazelisk v1.14.0
 	github.com/bazelbuild/buildtools v0.0.0-20250826111327-4006b543a694
 	github.com/bazelbuild/rules_go v0.57.0
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
@@ -21,7 +22,6 @@ require (
 )
 
 require (
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/docker/docker v27.1.1+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
